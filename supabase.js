@@ -1,8 +1,8 @@
 // supabase.js - Konfigurasi Supabase Client
 // GANTI URL DAN KEY DI BAWAH DENGAN PUNYA KAMU
 
-const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+const SUPABASE_URL = 'https://afqskvqritwyeduqsvyr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_W0xHaMYNdiUGwRPXN37J5A_yaRurxgW';
 
 // Inisialisasi Supabase Client
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
