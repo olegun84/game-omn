@@ -1,11 +1,11 @@
-// teacher.js - Teacher Dashboard Logic
+// teacher.js - Teacher Dashboard Logic v3
 
 class TeacherDashboard {
   constructor() {
     this.isAuthenticated = false;
     this.currentFilter = 'all';
     this.refreshInterval = null;
-    this.TEACHER_PASSWORD = 'guru2026'; // Change this in production!
+    this.TEACHER_PASSWORD = 'guru2026';
     
     this.init();
   }
@@ -17,9 +17,9 @@ class TeacherDashboard {
 
   createStars() {
     const starsContainer = document.querySelector('.stars');
-    if (!starsContainer) return;
+    if (!starsContainer || starsContainer.children.length > 0) return;
     
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 80; i++) {
       const star = document.createElement('div');
       star.className = 'star';
       star.style.left = Math.random() * 100 + '%';
@@ -30,19 +30,14 @@ class TeacherDashboard {
   }
 
   setupEventListeners() {
-    // Login
     document.getElementById('loginBtn')?.addEventListener('click', () => this.login());
     document.getElementById('teacherPassword')?.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') this.login();
     });
     
-    // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
-    
-    // Refresh
     document.getElementById('refreshBtn')?.addEventListener('click', () => this.fetchData());
     
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -63,7 +58,8 @@ class TeacherDashboard {
       this.startAutoRefresh();
     } else {
       alert('❌ Password salah! Coba lagi.');
-      document.getElementById('teacherPassword').value = '';
+      const input = document.getElementById('teacherPassword');
+      if (input) input.value = '';
     }
   }
 
@@ -71,7 +67,8 @@ class TeacherDashboard {
     this.isAuthenticated = false;
     if (this.refreshInterval) clearInterval(this.refreshInterval);
     this.showScreen('loginScreen');
-    document.getElementById('teacherPassword').value = '';
+    const input = document.getElementById('teacherPassword');
+    if (input) input.value = '';
   }
 
   showScreen(screenId) {
@@ -85,7 +82,7 @@ class TeacherDashboard {
       if (this.isAuthenticated) {
         this.fetchData();
       }
-    }, 5000); // Refresh every 5 seconds
+    }, 5000);
   }
 
   async fetchData() {
@@ -97,15 +94,12 @@ class TeacherDashboard {
       
       if (error) throw error;
       
-      // Filter by grade if needed
       if (this.currentFilter !== 'all') {
-        games = games.filter(g => g.grade === parseInt(this.currentFilter));
+        games = games.filter(g => g.grade === this.currentFilter);
       }
       
-      // Update stats
       this.updateStats(games);
       
-      // Render game cards
       if (games && games.length > 0) {
         grid.innerHTML = games.map(game => this.renderGameCard(game)).join('');
       } else {
@@ -114,7 +108,7 @@ class TeacherDashboard {
             <div class="no-games-emoji">🎮</div>
             <p>Tidak ada siswa yang sedang bermain saat ini</p>
             <p style="font-size: 0.8rem; margin-top: 10px; color: #666;">
-              Data akan muncul otomatis ketika siswa mulai bermain
+              Data muncul otomatis ketika siswa mulai bermain
             </p>
           </div>
         `;
@@ -135,7 +129,7 @@ class TeacherDashboard {
 
   updateStats(games) {
     const totalActive = document.getElementById('totalActive');
-    const totalDefeated = document.getElementById('totalDefeated');
+    const totalScore = document.getElementById('totalScore');
     const avgScore = document.getElementById('avgScore');
     const highestScore = document.getElementById('highestScore');
     
@@ -143,13 +137,13 @@ class TeacherDashboard {
     
     if (games.length > 0) {
       const scores = games.map(g => g.score || 0);
-      const totalScore = scores.reduce((a, b) => a + b, 0);
+      const total = scores.reduce((a, b) => a + b, 0);
       
-      if (totalDefeated) totalDefeated.textContent = games.reduce((a, g) => a + (g.enemies_defeated || 0), 0);
-      if (avgScore) avgScore.textContent = Math.round(totalScore / games.length);
+      if (totalScore) totalScore.textContent = total;
+      if (avgScore) avgScore.textContent = Math.round(total / games.length);
       if (highestScore) highestScore.textContent = Math.max(...scores);
     } else {
-      if (totalDefeated) totalDefeated.textContent = '0';
+      if (totalScore) totalScore.textContent = '0';
       if (avgScore) avgScore.textContent = '0';
       if (highestScore) highestScore.textContent = '0';
     }
@@ -158,20 +152,35 @@ class TeacherDashboard {
   renderGameCard(game) {
     const options = game.options || [];
     const correctAnswer = game.correct_answer || '-';
+    const solution = game.solution || [];
+    const quickTip = game.quick_tip || '';
     
-    const optionsHtml = options.map((opt, idx) => {
+    const optionsHtml = options.map((opt) => {
       const isCorrect = opt === correctAnswer;
       return `<div class="game-card-option ${isCorrect ? 'is-correct' : ''}">${opt} ${isCorrect ? '✅' : ''}</div>`;
     }).join('');
     
+    const solutionHtml = solution.length > 0 ? `
+      <div class="solution-box">
+        <div class="solution-title">📝 Cara Menyelesaikan (Metode Termudah)</div>
+        <ol class="solution-steps">
+          ${solution.map(step => `<li>${step}</li>`).join('')}
+        </ol>
+        ${quickTip ? `<div class="quick-tip">${quickTip}</div>` : ''}
+      </div>
+    ` : '';
+    
     const timeAgo = this.getTimeAgo(game.updated_at);
+    const gradeLabel = game.grade === 'all' ? 'Campuran' : `Kelas ${game.grade}`;
     
     return `
       <div class="game-card">
         <div class="game-card-header">
           <span class="game-card-player">🎮 ${game.player_name}</span>
-          <span class="game-card-grade">Kelas ${game.grade}</span>
+          <span class="game-card-grade">${gradeLabel}</span>
         </div>
+        
+        <div class="game-card-topic">📌 ${game.current_topic || 'Matematika'}</div>
         
         <div class="game-card-question">
           <strong>📝 Soal:</strong><br>
@@ -186,6 +195,8 @@ class TeacherDashboard {
         <div class="game-card-options">
           ${optionsHtml}
         </div>
+        
+        ${solutionHtml}
         
         <div class="game-card-score">
           <span style="color: #aaa; font-size: 0.8rem;">⏱️ ${timeAgo}</span>
@@ -210,7 +221,6 @@ class TeacherDashboard {
   }
 }
 
-// Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   window.teacherDashboard = new TeacherDashboard();
 });
