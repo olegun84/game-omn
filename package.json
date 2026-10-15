@@ -1,0 +1,13 @@
+{
+  "name": "omn-math-shooter",
+  "version": "1.0.0",
+  "description": "Interactive Math Shooter Game for OMN 2026",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": ["math", "game", "education", "omn"],
+  "author": "OMN 2026",
+  "license": "MIT"
+}

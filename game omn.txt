@@ -1,0 +1,13 @@
+
+
+
+omn-math-shooter/
+├── index.html          (Game utama)
+├── teacher.html        (Dashboard guru)
+├── style.css           (Styling)
+├── game.js             (Logic game)
+├── teacher.js          (Logic dashboard guru)
+├── supabase.js         (Konfigurasi Supabase + fallback soal)
+├── supabase-setup.sql  (Schema database + soal)
+├── package.json
+└── vercel.json

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👨‍🏫 Dashboard Guru - Math Shooter</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        
+        .teacher-login {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .teacher-login h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--neon-blue);
+        }
+        
+        .teacher-login p {
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            width: 100%;
+            max-width: 1200px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .stat-card {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(108, 99, 255, 0.3);
+        }
+        
+        .stat-card-value {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--neon-green);
+        }
+        
+        .stat-card-label {
+            font-size: 0.8rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
+        
+        .filter-bar {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 8px 20px;
+            border: 2px solid rgba(108, 99, 255, 0.3);
+            border-radius: 25px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--neon-blue);
+        }
+        
+        .auto-refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--neon-green);
+            font-size: 0.9rem;
+        }
+        
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    <div class="stars"></div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen active">
+        <div class="teacher-login">
+            <div style="font-size: 60px; margin-bottom: 20px;">👨‍🏫</div>
+            <h2>Dashboard Guru</h2>
+            <p>Masuk untuk memantau permainan siswa dan melihat kunci jawaban</p>
+            
+            <div class="input-group">
+                <label>🔑 Password Guru</label>
+                <input type="password" id="teacherPassword" placeholder="Masukkan password...">
+            </div>
+            
+            <button class="btn btn-primary" id="loginBtn">🔓 MASUK</button>
+            
+            <br><br>
+            <a href="index.html" style="color: #aaa; text-decoration: none;">← Kembali ke Game</a>
+            
+            <p style="margin-top: 20px; font-size: 0.8rem; color: #666;">
+                Default password: <strong>guru2026</strong>
+            </p>
+        </div>
+    </div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboardScreen" class="screen">
+        <!-- Header -->
+        <div class="teacher-header">
+            <div>
+                <h1 class="teacher-title">👨‍🏫 Dashboard Guru</h1>
+                <div class="auto-refresh-indicator">
+                    <div class="pulse-dot"></div>
+                    <span>Auto-refresh aktif (5 detik)</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="refresh-btn" id="refreshBtn">🔄 Refresh</button>
+                <button class="refresh-btn" id="logoutBtn" style="border-color: var(--danger); color: var(--danger);">🚪 Logout</button>
+                <a href="index.html" class="refresh-btn" style="text-decoration: none; display: flex; align-items: center;">🎮 Game</a>
+            </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-card-value" id="totalActive">0</div>
+                <div class="stat-card-label">Siswa Aktif</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="totalDefeated">0</div>
+                <div class="stat-card-label">Total Musuh Dikalahkan</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="avgScore">0</div>
+                <div class="stat-card-label">Rata-rata Skor</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="highestScore">0</div>
+                <div class="stat-card-label">Skor Tertinggi</div>
+            </div>
+        </div>
+        
+        <!-- Filter -->
+        <div class="filter-bar">
+            <button class="filter-btn active" data-grade="all">Semua Kelas</button>
+            <button class="filter-btn" data-grade="1">Kelas 1</button>
+            <button class="filter-btn" data-grade="2">Kelas 2</button>
+            <button class="filter-btn" data-grade="3">Kelas 3</button>
+            <button class="filter-btn" data-grade="4">Kelas 4</button>
+            <button class="filter-btn" data-grade="5">Kelas 5</button>
+            <button class="filter-btn" data-grade="6">Kelas 6</button>
+        </div>
+        
+        <!-- Active Games Grid -->
+        <div class="active-games-grid" id="activeGamesGrid">
+            <div class="no-games">
+                <div class="no-games-emoji">📡</div>
+                <p>Memuat data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="supabase.js"></script>
+    <script src="teacher.js"></script>
+</body>
+</html>
