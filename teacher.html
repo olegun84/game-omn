@@ -5,111 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>👨‍🏫 Dashboard Guru - Math Shooter</title>
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Poppins', sans-serif; }
-        
-        .teacher-login {
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
+        .solution-box {
+            background: rgba(0, 245, 255, 0.05);
+            border: 2px solid var(--neon-blue);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
         }
         
-        .teacher-login h2 {
-            font-size: 1.8rem;
-            margin-bottom: 20px;
+        .solution-title {
+            font-size: 0.85rem;
             color: var(--neon-blue);
-        }
-        
-        .teacher-login p {
-            color: #aaa;
-            margin-bottom: 20px;
-        }
-        
-        .stats-grid {
-            width: 100%;
-            max-width: 1200px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        
-        .stat-card {
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid rgba(108, 99, 255, 0.3);
-        }
-        
-        .stat-card-value {
-            font-size: 2.5rem;
-            font-weight: 900;
-            color: var(--neon-green);
-        }
-        
-        .stat-card-label {
-            font-size: 0.8rem;
-            color: #aaa;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-top: 5px;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
         
-        .filter-bar {
-            width: 100%;
-            max-width: 1200px;
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+        .solution-steps {
+            list-style: none;
+            counter-reset: step;
         }
         
-        .filter-btn {
-            padding: 8px 20px;
-            border: 2px solid rgba(108, 99, 255, 0.3);
-            border-radius: 25px;
-            background: transparent;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 600;
+        .solution-steps li {
+            counter-increment: step;
+            padding: 8px 0 8px 35px;
+            position: relative;
+            font-size: 0.9rem;
+            color: #ddd;
+            line-height: 1.5;
         }
         
-        .filter-btn.active {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-        
-        .filter-btn:hover {
-            border-color: var(--neon-blue);
-        }
-        
-        .auto-refresh-indicator {
+        .solution-steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 24px;
+            height: 24px;
+            background: var(--neon-blue);
+            color: var(--dark);
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 8px;
-            color: var(--neon-green);
-            font-size: 0.9rem;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
         }
         
-        .pulse-dot {
-            width: 10px;
-            height: 10px;
-            background: var(--neon-green);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
+        .quick-tip {
+            margin-top: 12px;
+            padding: 10px 15px;
+            background: rgba(255, 214, 0, 0.1);
+            border-left: 3px solid var(--warning);
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            color: var(--warning);
         }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
+        .quick-tip::before {
+            content: '💡 ';
         }
     </style>
 </head>
@@ -119,10 +78,10 @@
 
     <!-- Login Screen -->
     <div id="loginScreen" class="screen active">
-        <div class="teacher-login">
+        <div style="max-width: 400px; width: 100%; text-align: center;">
             <div style="font-size: 60px; margin-bottom: 20px;">👨‍🏫</div>
-            <h2>Dashboard Guru</h2>
-            <p>Masuk untuk memantau permainan siswa dan melihat kunci jawaban</p>
+            <h2 style="font-size: 1.8rem; margin-bottom: 20px; color: var(--neon-blue);">Dashboard Guru</h2>
+            <p style="color: #aaa; margin-bottom: 20px;">Pantau permainan siswa dan lihat cara menyelesaikan soal</p>
             
             <div class="input-group">
                 <label>🔑 Password Guru</label>
@@ -142,7 +101,6 @@
 
     <!-- Dashboard Screen -->
     <div id="dashboardScreen" class="screen">
-        <!-- Header -->
         <div class="teacher-header">
             <div>
                 <h1 class="teacher-title">👨‍🏫 Dashboard Guru</h1>
@@ -154,19 +112,18 @@
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button class="refresh-btn" id="refreshBtn">🔄 Refresh</button>
                 <button class="refresh-btn" id="logoutBtn" style="border-color: var(--danger); color: var(--danger);">🚪 Logout</button>
-                <a href="index.html" class="refresh-btn" style="text-decoration: none; display: flex; align-items: center;">🎮 Game</a>
+                <a href="index.html" class="refresh-btn">🎮 Game</a>
             </div>
         </div>
         
-        <!-- Stats -->
-        <div class="stats-grid" id="statsGrid">
+        <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-card-value" id="totalActive">0</div>
                 <div class="stat-card-label">Siswa Aktif</div>
             </div>
             <div class="stat-card">
-                <div class="stat-card-value" id="totalDefeated">0</div>
-                <div class="stat-card-label">Total Musuh Dikalahkan</div>
+                <div class="stat-card-value" id="totalScore">0</div>
+                <div class="stat-card-label">Total Skor</div>
             </div>
             <div class="stat-card">
                 <div class="stat-card-value" id="avgScore">0</div>
@@ -178,18 +135,19 @@
             </div>
         </div>
         
-        <!-- Filter -->
         <div class="filter-bar">
-            <button class="filter-btn active" data-grade="all">Semua Kelas</button>
+            <button class="filter-btn active" data-grade="all">Semua</button>
             <button class="filter-btn" data-grade="1">Kelas 1</button>
             <button class="filter-btn" data-grade="2">Kelas 2</button>
             <button class="filter-btn" data-grade="3">Kelas 3</button>
             <button class="filter-btn" data-grade="4">Kelas 4</button>
             <button class="filter-btn" data-grade="5">Kelas 5</button>
             <button class="filter-btn" data-grade="6">Kelas 6</button>
+            <button class="filter-btn" data-grade="7">Kelas 7</button>
+            <button class="filter-btn" data-grade="8">Kelas 8</button>
+            <button class="filter-btn" data-grade="9">Kelas 9</button>
         </div>
         
-        <!-- Active Games Grid -->
         <div class="active-games-grid" id="activeGamesGrid">
             <div class="no-games">
                 <div class="no-games-emoji">📡</div>
@@ -198,7 +156,6 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="supabase.js"></script>
     <script src="teacher.js"></script>
 </body>
