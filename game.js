@@ -1,9 +1,9 @@
-// game.js - Main Game Logic
+// game.js - Main Game Logic v3
 
 class MathShooterGame {
   constructor() {
     this.playerName = '';
-    this.grade = 1;
+    this.grade = '1';
     this.sessionId = this.generateSessionId();
     this.score = 0;
     this.combo = 0;
@@ -15,13 +15,10 @@ class MathShooterGame {
     this.questions = [];
     this.currentQuestionIndex = 0;
     this.currentEnemy = null;
-    this.gameLoop = null;
     this.timerInterval = null;
-    this.questionTime = 15000; // 15 seconds per question
-    this.timeLeft = 15000;
-    this.isPaused = false;
-    this.enemies = [];
-    this.enemySpeed = 1;
+    this.questionTime = 25000; // 25 detik
+    this.timeLeft = 25000;
+    this.enemySpeed = 0.7;
     this.wave = 1;
     this.gameActive = false;
     
@@ -39,30 +36,22 @@ class MathShooterGame {
 
   createStars() {
     const starsContainer = document.querySelector('.stars');
-    if (!starsContainer) return;
+    if (!starsContainer || starsContainer.children.length > 0) return;
     
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 80; i++) {
       const star = document.createElement('div');
       star.className = 'star';
       star.style.left = Math.random() * 100 + '%';
       star.style.top = Math.random() * 100 + '%';
       star.style.animationDelay = Math.random() * 3 + 's';
-      star.style.animationDuration = (2 + Math.random() * 3) + 's';
       starsContainer.appendChild(star);
     }
   }
 
   setupEventListeners() {
-    // Start game button
     document.getElementById('startBtn')?.addEventListener('click', () => this.startGame());
-    
-    // Play again
     document.getElementById('playAgainBtn')?.addEventListener('click', () => this.restartGame());
-    
-    // Back to menu
     document.getElementById('menuBtn')?.addEventListener('click', () => this.showScreen('menuScreen'));
-    
-    // Leaderboard
     document.getElementById('leaderboardBtn')?.addEventListener('click', () => this.showLeaderboard());
     document.getElementById('backFromLeaderboard')?.addEventListener('click', () => this.showScreen('menuScreen'));
   }
@@ -74,9 +63,9 @@ class MathShooterGame {
 
   async startGame() {
     this.playerName = document.getElementById('playerName').value.trim() || 'Player';
-    this.grade = parseInt(document.getElementById('gradeSelect').value);
+    this.grade = document.getElementById('gradeSelect').value;
     
-    // Reset game state
+    // Reset state
     this.score = 0;
     this.combo = 0;
     this.maxCombo = 0;
@@ -86,21 +75,15 @@ class MathShooterGame {
     this.correctAnswers = 0;
     this.currentQuestionIndex = 0;
     this.wave = 1;
-    this.enemySpeed = 1;
+    this.enemySpeed = 0.7;
     this.gameActive = true;
     
-    // Fetch questions
-    try {
-      this.questions = await DB.getQuestions(this.grade, 20);
-    } catch (e) {
-      this.questions = DB.getFallbackQuestions(this.grade, 20);
-    }
+    // Generate soal dengan QuestionGenerator
+    this.questions = await DB.getQuestions(this.grade, 15);
     
-    if (this.questions.length === 0) {
-      this.questions = DB.getFallbackQuestions(this.grade, 20);
-    }
+    const gradeLabel = this.grade === 'all' ? 'Semua Kelas' : `Kelas ${this.grade}`;
+    document.getElementById('resultPlayerName').textContent = `Pemain: ${this.playerName} | ${gradeLabel}`;
     
-    // Switch to game screen
     this.showScreen('gameScreen');
     this.updateHUD();
     this.startWave();
@@ -119,63 +102,64 @@ class MathShooterGame {
     const gameArea = document.querySelector('.game-area');
     if (!gameArea) return;
     
-    // Remove existing enemies
     document.querySelectorAll('.enemy').forEach(e => e.remove());
     
     const question = this.questions[this.currentQuestionIndex];
-    const enemyType = Math.random() > 0.5 ? 'zombie' : 'helicopter';
-    const enemyEmoji = enemyType === 'zombie' ? '🧟' : '🚁';
+    const rand = Math.random();
+    
+    let enemyType, enemyEmoji;
+    if (this.currentQuestionIndex > 0 && this.currentQuestionIndex % 5 === 4) {
+      enemyType = 'boss';
+      enemyEmoji = '👾';
+    } else if (rand > 0.5) {
+      enemyType = 'zombie';
+      enemyEmoji = '🧟';
+    } else {
+      enemyType = 'helicopter';
+      enemyEmoji = '🚁';
+    }
     
     const enemy = document.createElement('div');
     enemy.className = `enemy ${enemyType}`;
     enemy.textContent = enemyEmoji;
     
-    // Position
-    const areaWidth = gameArea.offsetWidth;
     const areaHeight = gameArea.offsetHeight;
     
-    if (enemyType === 'zombie') {
-      enemy.style.right = '-60px';
+    if (enemyType === 'zombie' || enemyType === 'boss') {
+      enemy.style.right = '-80px';
       enemy.style.bottom = '60px';
     } else {
-      enemy.style.right = '-60px';
+      enemy.style.right = '-80px';
       enemy.style.top = (20 + Math.random() * (areaHeight / 2)) + 'px';
     }
     
     gameArea.appendChild(enemy);
     
-    // Update active game in database
+    // KIRIM SOLUTION KE DATABASE UNTUK GURU
     this.updateActiveGameInDB(question);
     
-    // Show question
     this.showQuestion(question);
-    
-    // Start enemy movement
     this.moveEnemy(enemy, enemyType);
-    
-    // Start timer
     this.startTimer();
   }
 
   moveEnemy(enemy, type) {
-    let position = -60;
+    let position = -80;
     const gameArea = document.querySelector('.game-area');
     const areaWidth = gameArea?.offsetWidth || 800;
-    const speed = this.enemySpeed * (type === 'zombie' ? 0.5 : 1);
+    
+    const speed = type === 'boss' ? this.enemySpeed * 0.6 : this.enemySpeed;
     
     const moveInterval = setInterval(() => {
-      if (!this.gameActive || this.isPaused) return;
-      
-      position += speed;
-      
-      if (type === 'zombie') {
-        enemy.style.right = position + 'px';
-      } else {
-        enemy.style.right = position + 'px';
+      if (!this.gameActive) {
+        clearInterval(moveInterval);
+        return;
       }
       
-      // Enemy reached the player
-      if (position > areaWidth + 60) {
+      position += speed;
+      enemy.style.right = position + 'px';
+      
+      if (position > areaWidth + 80) {
         clearInterval(moveInterval);
         this.enemyReachedPlayer();
       }
@@ -187,28 +171,37 @@ class MathShooterGame {
   enemyReachedPlayer() {
     this.health -= 20;
     this.combo = 0;
+    this.questionsAnswered++;
     this.updateHUD();
     
-    // Screen shake effect
-    document.querySelector('.game-area').style.animation = 'wrongShake 0.5s ease';
-    setTimeout(() => {
-      document.querySelector('.game-area').style.animation = '';
-    }, 500);
-    
-    if (this.health <= 0) {
-      this.endGame();
-    } else {
-      this.nextQuestion();
+    const gameArea = document.querySelector('.game-area');
+    if (gameArea) {
+      gameArea.style.animation = 'wrongShake 0.5s ease';
+      setTimeout(() => {
+        gameArea.style.animation = '';
+      }, 500);
     }
+    
+    this.createExplosion('💥');
+    
+    setTimeout(() => {
+      if (this.health <= 0) {
+        this.endGame();
+      } else {
+        this.nextQuestion();
+      }
+    }, 1000);
   }
 
   showQuestion(question) {
     const questionText = document.getElementById('questionText');
     const questionTopic = document.getElementById('questionTopic');
     const optionsGrid = document.getElementById('optionsGrid');
+    const waveIndicator = document.getElementById('waveIndicator');
     
     if (questionText) questionText.textContent = question.question;
-    if (questionTopic) questionTopic.textContent = question.topic;
+    if (questionTopic) questionTopic.textContent = question.topic || 'Matematika';
+    if (waveIndicator) waveIndicator.textContent = `SOAL ${this.currentQuestionIndex + 1} / ${this.questions.length}`;
     
     if (optionsGrid) {
       optionsGrid.innerHTML = '';
@@ -229,7 +222,7 @@ class MathShooterGame {
     if (this.timerInterval) clearInterval(this.timerInterval);
     
     this.timerInterval = setInterval(() => {
-      if (this.isPaused) return;
+      if (!this.gameActive) return;
       
       this.timeLeft -= 100;
       const percentage = (this.timeLeft / this.questionTime) * 100;
@@ -246,21 +239,22 @@ class MathShooterGame {
   }
 
   timeUp() {
+    if (this.currentEnemy?.interval) clearInterval(this.currentEnemy.interval);
+    
     this.combo = 0;
     this.health -= 10;
     this.questionsAnswered++;
     this.updateHUD();
     
-    // Show correct answer
     const question = this.questions[this.currentQuestionIndex];
     const options = document.querySelectorAll('.option-btn');
     options.forEach((opt, idx) => {
+      opt.style.pointerEvents = 'none';
       if (idx === question.correct_answer) {
         opt.classList.add('correct');
       }
     });
     
-    // Create explosion for wrong answer
     this.createExplosion('⏰');
     
     setTimeout(() => {
@@ -282,20 +276,17 @@ class MathShooterGame {
     
     this.questionsAnswered++;
     
-    // Disable all options
     options.forEach(opt => {
       opt.style.pointerEvents = 'none';
     });
     
     if (isCorrect) {
-      // Correct answer!
       options[selectedIndex].classList.add('correct');
       this.combo++;
       this.correctAnswers++;
       
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;
       
-      // Calculate score with combo bonus
       const timeBonus = Math.floor(this.timeLeft / 1000);
       const comboBonus = this.combo * 10;
       const baseScore = 100;
@@ -304,30 +295,29 @@ class MathShooterGame {
       this.score += totalPoints;
       this.enemiesDefeated++;
       
-      // Kill enemy animation
       const enemy = this.currentEnemy?.element;
       if (enemy) {
+        const rect = enemy.getBoundingClientRect();
+        const gameRect = document.querySelector('.game-area').getBoundingClientRect();
+        const x = rect.left - gameRect.left + rect.width / 2;
+        const y = rect.top - gameRect.top + rect.height / 2;
+        
         enemy.classList.add('dying');
-        this.createExplosion('💥', enemy.offsetLeft, enemy.offsetTop);
-        this.createScorePopup('+' + totalPoints, enemy.offsetLeft, enemy.offsetTop);
+        this.createExplosion('💥', x, y);
+        this.createScorePopup('+' + totalPoints, x, y);
+        this.createParticles(x, y);
       }
       
-      // Show combo indicator
       if (this.combo >= 3) {
         this.showCombo(this.combo);
       }
       
-      // Create particles
-      this.createParticles(enemy?.offsetLeft || 400, enemy?.offsetTop || 150);
-      
-      // Increase difficulty
       if (this.enemiesDefeated % 5 === 0) {
         this.wave++;
-        this.enemySpeed += 0.3;
+        this.enemySpeed += 0.15;
       }
       
     } else {
-      // Wrong answer
       options[selectedIndex].classList.add('wrong');
       options[question.correct_answer].classList.add('correct');
       this.combo = 0;
@@ -337,18 +327,6 @@ class MathShooterGame {
     }
     
     this.updateHUD();
-    
-    // Update active game in DB
-    DB.updateActiveGame(
-      this.sessionId,
-      this.playerName,
-      this.grade,
-      question.id,
-      question.question,
-      question.options[question.correct_answer],
-      question.options,
-      this.score
-    );
     
     setTimeout(() => {
       if (this.health <= 0) {
@@ -404,8 +382,8 @@ class MathShooterGame {
     const popup = document.createElement('div');
     popup.className = 'score-popup';
     popup.textContent = text;
-    popup.style.left = (x || gameArea.offsetWidth / 2) + 'px';
-    popup.style.top = (y || gameArea.offsetHeight / 2 - 30) + 'px';
+    popup.style.left = x + 'px';
+    popup.style.top = (y - 30) + 'px';
     gameArea.appendChild(popup);
     
     setTimeout(() => popup.remove(), 1000);
@@ -417,7 +395,7 @@ class MathShooterGame {
     
     const colors = ['#FF6584', '#6C63FF', '#00f5ff', '#39ff14', '#FFD600', '#ff00ff'];
     
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 12; i++) {
       const particle = document.createElement('div');
       particle.className = 'particle';
       particle.style.left = x + 'px';
@@ -446,14 +424,16 @@ class MathShooterGame {
         this.sessionId,
         this.playerName,
         this.grade,
-        question.id,
         question.question,
+        question.topic,
         question.options[question.correct_answer],
         question.options,
+        question.solution || [],
+        question.quick_tip || '',
         this.score
       );
     } catch (e) {
-      console.log('DB update skipped (offline mode)');
+      console.log('DB update skipped');
     }
   }
 
@@ -463,31 +443,28 @@ class MathShooterGame {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.currentEnemy?.interval) clearInterval(this.currentEnemy.interval);
     
-    // End game session in DB
-    try {
-      await DB.endGame(this.sessionId);
-      await DB.saveScore(this.playerName, this.grade, this.score, this.enemiesDefeated, this.sessionId);
-    } catch (e) {
-      console.log('DB save skipped (offline mode)');
-    }
-    
-    // Show results
-    this.showResults();
-  }
-
-  showResults() {
-    this.showScreen('resultScreen');
-    
     const accuracy = this.questionsAnswered > 0 
       ? Math.round((this.correctAnswers / this.questionsAnswered) * 100) 
       : 0;
+    
+    try {
+      await DB.endGame(this.sessionId);
+      await DB.saveScore(this.playerName, this.grade, this.score, this.enemiesDefeated, accuracy, this.maxCombo, this.sessionId);
+    } catch (e) {
+      console.log('DB save skipped');
+    }
+    
+    this.showResults(accuracy);
+  }
+
+  showResults(accuracy) {
+    this.showScreen('resultScreen');
     
     document.getElementById('resultScore').textContent = this.score;
     document.getElementById('resultDefeated').textContent = this.enemiesDefeated;
     document.getElementById('resultAccuracy').textContent = accuracy + '%';
     document.getElementById('resultCombo').textContent = this.maxCombo + 'x';
     
-    // Set result emoji based on performance
     const resultEmoji = document.getElementById('resultEmoji');
     const resultTitle = document.getElementById('resultTitle');
     
@@ -517,22 +494,23 @@ class MathShooterGame {
     const listEl = document.getElementById('leaderboardList');
     if (!listEl) return;
     
-    listEl.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Memuat...</p></div>';
+    listEl.innerHTML = '<li class="loading"><div class="loading-spinner"></div><p>Memuat...</p></li>';
     
     try {
-      const { data } = await DB.getLeaderboard(this.grade);
+      const { data } = await DB.getLeaderboard();
       
       if (data && data.length > 0) {
         listEl.innerHTML = data.map((item, index) => {
           const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
           const topClass = index < 3 ? `top-${index + 1}` : '';
+          const gradeLabel = item.grade === 'all' ? 'Semua Kelas' : `Kelas ${item.grade}`;
           
           return `
             <li class="leaderboard-item ${topClass}">
               <span class="rank">${rankEmoji}</span>
               <div class="player-info">
                 <div class="player-name-lb">${item.player_name}</div>
-                <div class="player-grade">Grade ${item.grade} | ${item.enemies_defeated} musuh</div>
+                <div class="player-grade">${gradeLabel} | Akurasi ${item.accuracy || 0}% | Combo ${item.max_combo || 0}x</div>
               </div>
               <span class="player-score-lb">${item.score}</span>
             </li>
@@ -542,12 +520,11 @@ class MathShooterGame {
         listEl.innerHTML = '<div class="no-games"><div class="no-games-emoji">🎮</div><p>Belum ada skor. Jadilah yang pertama!</p></div>';
       }
     } catch (e) {
-      listEl.innerHTML = '<div class="no-games"><div class="no-games-emoji">📡</div><p>Tidak dapat memuat leaderboard</p></div>';
+      listEl.innerHTML = '<div class="no-games"><div class="no-games-emoji">📡</div><p>Mode offline - leaderboard tidak tersedia</p></div>';
     }
   }
 }
 
-// Initialize game when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   window.game = new MathShooterGame();
 });
