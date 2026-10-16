@@ -1,530 +1,630 @@
-// game.js - Main Game Logic v3
+// ==================== SFX MANAGER ====================
+class SFXManager {
+  constructor() {
+    this.audioContext = null;
+    this.initialized = false;
+  }
 
+  init() {
+    if (this.initialized) return;
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.initialized = true;
+    } catch (e) {
+      console.warn('Web Audio API tidak tersedia');
+    }
+  }
+
+  playTone(frequency, duration, type = 'square', volume = 0.15) {
+    if (!this.audioContext) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+    gain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.audioContext.destination);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + duration);
+  }
+
+  playShoot() {
+    this.init();
+    this.playTone(800, 0.1, 'square', 0.12);
+    setTimeout(() => this.playTone(600, 0.08, 'square', 0.1), 50);
+  }
+
+  playCorrect() {
+    this.init();
+    this.playTone(523, 0.1, 'sine', 0.15);
+    setTimeout(() => this.playTone(659, 0.1, 'sine', 0.15), 100);
+    setTimeout(() => this.playTone(784, 0.15, 'sine', 0.15), 200);
+  }
+
+  playWrong() {
+    this.init();
+    this.playTone(200, 0.15, 'sawtooth', 0.12);
+    setTimeout(() => this.playTone(150, 0.2, 'sawtooth', 0.12), 150);
+  }
+
+  playCombo() {
+    this.init();
+    this.playTone(880, 0.08, 'sine', 0.12);
+    setTimeout(() => this.playTone(1100, 0.08, 'sine', 0.12), 80);
+    setTimeout(() => this.playTone(1320, 0.12, 'sine', 0.12), 160);
+  }
+
+  playWaveStart() {
+    this.init();
+    [440, 554, 659, 880].forEach((freq, i) => {
+      setTimeout(() => this.playTone(freq, 0.15, 'sine', 0.12), i * 100);
+    });
+  }
+
+  playGameOver() {
+    this.init();
+    [400, 350, 300, 200].forEach((freq, i) => {
+      setTimeout(() => this.playTone(freq, 0.2, 'sawtooth', 0.1), i * 150);
+    });
+  }
+
+  playEnemyHit() {
+    this.init();
+    this.playTone(300, 0.05, 'square', 0.1);
+    this.playTone(150, 0.1, 'square', 0.08);
+  }
+
+  playButton() {
+    this.init();
+    this.playTone(600, 0.05, 'sine', 0.1);
+  }
+}
+
+const sfx = new SFXManager();
+
+// ==================== MATH SHOOTER GAME ====================
 class MathShooterGame {
   constructor() {
-    this.playerName = '';
-    this.grade = '1';
-    this.sessionId = this.generateSessionId();
     this.score = 0;
     this.combo = 0;
-    this.maxCombo = 0;
-    this.health = 100;
-    this.enemiesDefeated = 0;
-    this.questionsAnswered = 0;
-    this.correctAnswers = 0;
-    this.questions = [];
-    this.currentQuestionIndex = 0;
-    this.currentEnemy = null;
-    this.timerInterval = null;
-    this.questionTime = 25000; // 25 detik
-    this.timeLeft = 25000;
-    this.enemySpeed = 0.7;
     this.wave = 1;
-    this.gameActive = false;
-    
+    this.defeats = 0;
+    this.currentQuestion = 0;
+    this.totalQuestions = 15;
+    this.enemies = [];
+    this.bullets = [];
+    this.particles = [];
+    this.canvas = null;
+    this.ctx = null;
+    this.playerX = 400;
+    this.playerY = 500;
+    this.gameActive = true;
+    this.questionData = null;
+    this.answerChoices = []; // ← PENTING: inisialisasi array
+    this.waveEnemies = [];
+    this.waveIndex = 0;
+    this.keys = {};
+    this.lastShot = 0;
+    this.shootCooldown = 250;
+
     this.init();
   }
 
   init() {
-    this.setupEventListeners();
-    this.createStars();
-  }
-
-  generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
-
-  createStars() {
-    const starsContainer = document.querySelector('.stars');
-    if (!starsContainer || starsContainer.children.length > 0) return;
-    
-    for (let i = 0; i < 80; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
-      star.style.left = Math.random() * 100 + '%';
-      star.style.top = Math.random() * 100 + '%';
-      star.style.animationDelay = Math.random() * 3 + 's';
-      starsContainer.appendChild(star);
+    this.canvas = document.getElementById('gameCanvas');
+    if (!this.canvas) {
+      console.error('Canvas tidak ditemukan!');
+      return;
     }
+    this.ctx = this.canvas.getContext('2d');
+    this.setupEventListeners();
+    this.nextQuestion();
+    this.gameLoop();
   }
 
   setupEventListeners() {
-    document.getElementById('startBtn')?.addEventListener('click', () => this.startGame());
-    document.getElementById('playAgainBtn')?.addEventListener('click', () => this.restartGame());
-    document.getElementById('menuBtn')?.addEventListener('click', () => this.showScreen('menuScreen'));
-    document.getElementById('leaderboardBtn')?.addEventListener('click', () => this.showLeaderboard());
-    document.getElementById('backFromLeaderboard')?.addEventListener('click', () => this.showScreen('menuScreen'));
+    document.addEventListener('keydown', (e) => {
+      this.keys[e.key] = true;
+      if (e.key === ' ' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.shoot();
+      }
+      // SFX: tombol tekan
+      sfx.init();
+    });
+    document.addEventListener('keyup', (e) => {
+      this.keys[e.key] = false;
+    });
+
+    // Inisialisasi audio saat klik pertama
+    document.addEventListener('click', () => sfx.init(), { once: true });
   }
 
-  showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId)?.classList.add('active');
+  generateQuestion() {
+    const topics = ['nilai_tempat', 'penjumlahan', 'pengurangan', 'perkalian', 'pembagian'];
+    const topic = topics[Math.floor(Math.random() * topics.length)];
+
+    switch (topic) {
+      case 'nilai_tempat':
+        return this.generateNilaiTempat();
+      case 'penjumlahan':
+        return this.generatePenjumlahan();
+      case 'pengurangan':
+        return this.generatePengurangan();
+      case 'perkalian':
+        return this.generatePerkalian();
+      case 'pembagian':
+        return this.generatePembagian();
+      default:
+        return this.generatePenjumlahan();
+    }
   }
 
-  async startGame() {
-    this.playerName = document.getElementById('playerName').value.trim() || 'Player';
-    this.grade = document.getElementById('gradeSelect').value;
-    
-    // Reset state
-    this.score = 0;
-    this.combo = 0;
-    this.maxCombo = 0;
-    this.health = 100;
-    this.enemiesDefeated = 0;
-    this.questionsAnswered = 0;
-    this.correctAnswers = 0;
-    this.currentQuestionIndex = 0;
-    this.wave = 1;
-    this.enemySpeed = 0.7;
-    this.gameActive = true;
-    
-    // Generate soal dengan QuestionGenerator
-    this.questions = await DB.getQuestions(this.grade, 15);
-    
-    const gradeLabel = this.grade === 'all' ? 'Semua Kelas' : `Kelas ${this.grade}`;
-    document.getElementById('resultPlayerName').textContent = `Pemain: ${this.playerName} | ${gradeLabel}`;
-    
-    this.showScreen('gameScreen');
-    this.updateHUD();
+  generateNilaiTempat() {
+    const numbers = [
+      { num: 523, digit: 2, answer: 'puluhan', choices: ['ratusan', 'puluhan', 'satuan', 'ribuan'] },
+      { num: 1456, digit: 4, answer: 'ratusan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+      { num: 7891, digit: 8, answer: 'ratusan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+      { num: 3024, digit: 0, answer: 'ratusan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+      { num: 67, digit: 6, answer: 'puluhan', choices: ['ratusan', 'puluhan', 'satuan', 'ribuan'] },
+      { num: 4521, digit: 1, answer: 'satuan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+      { num: 8903, digit: 9, answer: 'ratusan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+      { num: 2345, digit: 2, answer: 'ribuan', choices: ['ribuan', 'ratusan', 'puluhan', 'satuan'] },
+    ];
+    const q = numbers[Math.floor(Math.random() * numbers.length)];
+    return {
+      text: `Pada angka ${q.num}, angka ${q.digit} menempati nilai tempat apa?`,
+      answer: q.answer,
+      choices: this.shuffleArray([...q.choices]),
+      topic: 'NILAI TEMPAT'
+    };
+  }
+
+  generatePenjumlahan() {
+    const a = Math.floor(Math.random() * 50) + 10;
+    const b = Math.floor(Math.random() * 50) + 10;
+    const answer = a + b;
+    const choices = this.generateChoices(answer);
+    return {
+      text: `${a} + ${b} = ?`,
+      answer: answer.toString(),
+      choices: choices.map(c => c.toString()),
+      topic: 'PENJUMLAHAN'
+    };
+  }
+
+  generatePengurangan() {
+    const a = Math.floor(Math.random() * 50) + 30;
+    const b = Math.floor(Math.random() * 30) + 1;
+    const answer = a - b;
+    const choices = this.generateChoices(answer);
+    return {
+      text: `${a} - ${b} = ?`,
+      answer: answer.toString(),
+      choices: choices.map(c => c.toString()),
+      topic: 'PENGURANGAN'
+    };
+  }
+
+  generatePerkalian() {
+    const a = Math.floor(Math.random() * 10) + 2;
+    const b = Math.floor(Math.random() * 10) + 2;
+    const answer = a * b;
+    const choices = this.generateChoices(answer);
+    return {
+      text: `${a} × ${b} = ?`,
+      answer: answer.toString(),
+      choices: choices.map(c => c.toString()),
+      topic: 'PERKALIAN'
+    };
+  }
+
+  generatePembagian() {
+    const b = Math.floor(Math.random() * 9) + 2;
+    const answer = Math.floor(Math.random() * 10) + 2;
+    const a = b * answer;
+    const choices = this.generateChoices(answer);
+    return {
+      text: `${a} ÷ ${b} = ?`,
+      answer: answer.toString(),
+      choices: choices.map(c => c.toString()),
+      topic: 'PEMBAGIAN'
+    };
+  }
+
+  generateChoices(correct) {
+    const choices = new Set([correct]);
+    while (choices.size < 4) {
+      const offset = Math.floor(Math.random() * 10) - 5;
+      const val = correct + (offset === 0 ? 1 : offset);
+      if (val > 0) choices.add(val);
+    }
+    return this.shuffleArray([...choices]);
+  }
+
+  shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  nextQuestion() {
+    this.currentQuestion++;
+    if (this.currentQuestion > this.totalQuestions) {
+      this.endGame();
+      return;
+    }
+
+    this.questionData = this.generateQuestion();
+
+    // PERBAIKAN: Pastikan answerChoices selalu array valid
+    this.answerChoices = this.questionData.choices || [];
+    if (!Array.isArray(this.answerChoices) || this.answerChoices.length === 0) {
+      this.answerChoices = ['A', 'B', 'C', 'D'];
+    }
+
+    this.updateUI();
     this.startWave();
   }
 
   startWave() {
-    if (!this.gameActive || this.currentQuestionIndex >= this.questions.length) {
-      this.endGame();
-      return;
+    this.waveEnemies = [];
+    sfx.playWaveStart();
+
+    // PERBAIKAN: Pastikan answerChoices ada sebelum forEach
+    if (!this.answerChoices || !Array.isArray(this.answerChoices)) {
+      console.error('answerChoices tidak valid:', this.answerChoices);
+      this.answerChoices = ['A', 'B', 'C', 'D'];
     }
-    
-    this.spawnEnemy();
+
+    this.answerChoices.forEach((choice, index) => {
+      const enemy = {
+        x: 100 + index * 180,
+        y: -50 - Math.random() * 200,
+        width: 80,
+        height: 50,
+        speed: 0.5 + Math.random() * 0.5,
+        answer: choice,
+        isCorrect: choice === this.questionData.answer,
+        alive: true,
+        color: this.getEnemyColor(index)
+      };
+      this.waveEnemies.push(enemy);
+    });
+
+    this.enemies = [...this.waveEnemies];
+    this.showQuestion();
+  }
+
+  showQuestion() {
+    const questionEl = document.getElementById('questionText');
+    const topicEl = document.getElementById('topicLabel');
+
+    if (questionEl) questionEl.textContent = this.questionData.text;
+    if (topicEl) topicEl.textContent = this.questionData.topic;
+
+    // PERBAIKAN UTAMA: Cek sebelum forEach
+    this.answerChoices = this.answerChoices || [];
+
+    this.answerChoices.forEach((choice, index) => {
+      const enemy = this.waveEnemies[index];
+      if (enemy) {
+        enemy.answer = choice;
+        enemy.isCorrect = (choice === this.questionData.answer);
+      }
+    });
+
+    // Update enemy labels di canvas
+    this.renderEnemies();
   }
 
   spawnEnemy() {
-    const gameArea = document.querySelector('.game-area');
-    if (!gameArea) return;
-    
-    document.querySelectorAll('.enemy').forEach(e => e.remove());
-    
-    const question = this.questions[this.currentQuestionIndex];
-    const rand = Math.random();
-    
-    let enemyType, enemyEmoji;
-    if (this.currentQuestionIndex > 0 && this.currentQuestionIndex % 5 === 4) {
-      enemyType = 'boss';
-      enemyEmoji = '👾';
-    } else if (rand > 0.5) {
-      enemyType = 'zombie';
-      enemyEmoji = '🧟';
-    } else {
-      enemyType = 'helicopter';
-      enemyEmoji = '🚁';
+    // PERBAIKAN: Pastikan answerChoices ada
+    if (!this.answerChoices || !Array.isArray(this.answerChoices)) {
+      this.answerChoices = this.questionData?.choices || ['A', 'B', 'C', 'D'];
     }
-    
-    const enemy = document.createElement('div');
-    enemy.className = `enemy ${enemyType}`;
-    enemy.textContent = enemyEmoji;
-    
-    const areaHeight = gameArea.offsetHeight;
-    
-    if (enemyType === 'zombie' || enemyType === 'boss') {
-      enemy.style.right = '-80px';
-      enemy.style.bottom = '60px';
-    } else {
-      enemy.style.right = '-80px';
-      enemy.style.top = (20 + Math.random() * (areaHeight / 2)) + 'px';
-    }
-    
-    gameArea.appendChild(enemy);
-    
-    // KIRIM SOLUTION KE DATABASE UNTUK GURU
-    this.updateActiveGameInDB(question);
-    
-    this.showQuestion(question);
-    this.moveEnemy(enemy, enemyType);
-    this.startTimer();
+
+    this.answerChoices.forEach((choice, index) => {
+      const existing = this.waveEnemies.find(e => e.answer === choice);
+      if (!existing) {
+        this.waveEnemies.push({
+          x: 100 + index * 180,
+          y: -50,
+          width: 80,
+          height: 50,
+          speed: 0.5 + Math.random() * 0.5,
+          answer: choice,
+          isCorrect: choice === this.questionData.answer,
+          alive: true,
+          color: this.getEnemyColor(index)
+        });
+      }
+    });
   }
 
-  moveEnemy(enemy, type) {
-    let position = -80;
-    const gameArea = document.querySelector('.game-area');
-    const areaWidth = gameArea?.offsetWidth || 800;
-    
-    const speed = type === 'boss' ? this.enemySpeed * 0.6 : this.enemySpeed;
-    
-    const moveInterval = setInterval(() => {
-      if (!this.gameActive) {
-        clearInterval(moveInterval);
-        return;
-      }
-      
-      position += speed;
-      enemy.style.right = position + 'px';
-      
-      if (position > areaWidth + 80) {
-        clearInterval(moveInterval);
-        this.enemyReachedPlayer();
-      }
-    }, 50);
-    
-    this.currentEnemy = { element: enemy, interval: moveInterval };
+  getEnemyColor(index) {
+    const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12'];
+    return colors[index % colors.length];
   }
 
-  enemyReachedPlayer() {
-    this.health -= 20;
-    this.combo = 0;
-    this.questionsAnswered++;
-    this.updateHUD();
-    
-    const gameArea = document.querySelector('.game-area');
-    if (gameArea) {
-      gameArea.style.animation = 'wrongShake 0.5s ease';
-      setTimeout(() => {
-        gameArea.style.animation = '';
-      }, 500);
+  shoot() {
+    const now = Date.now();
+    if (now - this.lastShot < this.shootCooldown) return;
+    this.lastShot = now;
+
+    sfx.playShoot();
+
+    this.bullets.push({
+      x: this.playerX,
+      y: this.playerY - 20,
+      width: 6,
+      height: 15,
+      speed: 8
+    });
+  }
+
+  update() {
+    if (!this.gameActive) return;
+
+    // Player movement
+    if (this.keys['ArrowLeft'] || this.keys['a']) this.playerX -= 5;
+    if (this.keys['ArrowRight'] || this.keys['d']) this.playerX += 5;
+    this.playerX = Math.max(30, Math.min(this.canvas.width - 30, this.playerX));
+
+    // Update bullets
+    this.bullets = this.bullets.filter(bullet => {
+      bullet.y -= bullet.speed;
+      return bullet.y > -20;
+    });
+
+    // Update enemies
+    this.enemies.forEach(enemy => {
+      if (enemy.alive) {
+        enemy.y += enemy.speed;
+        if (enemy.y > this.canvas.height + 50) {
+          enemy.alive = false;
+          if (enemy.isCorrect) {
+            this.defeats++;
+            this.combo = 0;
+            sfx.playWrong();
+            this.updateUI();
+          }
+        }
+      }
+    });
+
+    // Collision detection
+    this.bullets.forEach(bullet => {
+      this.enemies.forEach(enemy => {
+        if (!enemy.alive) return;
+        if (
+          bullet.x < enemy.x + enemy.width &&
+          bullet.x + bullet.width > enemy.x &&
+          bullet.y < enemy.y + enemy.height &&
+          bullet.y + bullet.height > enemy.y
+        ) {
+          bullet.y = -100;
+          enemy.alive = false;
+          sfx.playEnemyHit();
+
+          if (enemy.isCorrect) {
+            this.combo++;
+            const comboMultiplier = Math.min(this.combo, 5);
+            this.score += 100 * comboMultiplier;
+            sfx.playCorrect();
+            if (this.combo >= 3) sfx.playCombo();
+            this.createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#2ecc71');
+
+            setTimeout(() => this.nextQuestion(), 1000);
+          } else {
+            this.combo = 0;
+            this.defeats++;
+            sfx.playWrong();
+            this.createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#e74c3c');
+          }
+          this.updateUI();
+        }
+      });
+    });
+
+    // Update particles
+    this.particles = this.particles.filter(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.02;
+      p.vy += 0.1;
+      return p.life > 0;
+    });
+
+    // Check game over
+    if (this.defeats >= 5) {
+      this.gameOver();
     }
-    
-    this.createExplosion('💥');
-    
-    setTimeout(() => {
-      if (this.health <= 0) {
-        this.endGame();
-      } else {
-        this.nextQuestion();
-      }
-    }, 1000);
   }
 
-  showQuestion(question) {
-    const questionText = document.getElementById('questionText');
-    const questionTopic = document.getElementById('questionTopic');
-    const optionsGrid = document.getElementById('optionsGrid');
-    const waveIndicator = document.getElementById('waveIndicator');
-    
-    if (questionText) questionText.textContent = question.question;
-    if (questionTopic) questionTopic.textContent = question.topic || 'Matematika';
-    if (waveIndicator) waveIndicator.textContent = `SOAL ${this.currentQuestionIndex + 1} / ${this.questions.length}`;
-    
-    if (optionsGrid) {
-      optionsGrid.innerHTML = '';
-      question.options.forEach((option, index) => {
-        const btn = document.createElement('button');
-        btn.className = 'option-btn';
-        btn.textContent = option;
-        btn.onclick = () => this.selectAnswer(index);
-        optionsGrid.appendChild(btn);
+  createParticles(x, y, color) {
+    for (let i = 0; i < 12; i++) {
+      this.particles.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 6,
+        vy: (Math.random() - 0.5) * 6,
+        life: 1,
+        color,
+        size: Math.random() * 4 + 2
       });
     }
   }
 
-  startTimer() {
-    this.timeLeft = this.questionTime;
-    const timerFill = document.getElementById('timerFill');
-    
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    
-    this.timerInterval = setInterval(() => {
-      if (!this.gameActive) return;
-      
-      this.timeLeft -= 100;
-      const percentage = (this.timeLeft / this.questionTime) * 100;
-      
-      if (timerFill) {
-        timerFill.style.width = percentage + '%';
-      }
-      
-      if (this.timeLeft <= 0) {
-        clearInterval(this.timerInterval);
-        this.timeUp();
-      }
-    }, 100);
-  }
+  render() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
 
-  timeUp() {
-    if (this.currentEnemy?.interval) clearInterval(this.currentEnemy.interval);
-    
-    this.combo = 0;
-    this.health -= 10;
-    this.questionsAnswered++;
-    this.updateHUD();
-    
-    const question = this.questions[this.currentQuestionIndex];
-    const options = document.querySelectorAll('.option-btn');
-    options.forEach((opt, idx) => {
-      opt.style.pointerEvents = 'none';
-      if (idx === question.correct_answer) {
-        opt.classList.add('correct');
-      }
-    });
-    
-    this.createExplosion('⏰');
-    
-    setTimeout(() => {
-      if (this.health <= 0) {
-        this.endGame();
-      } else {
-        this.nextQuestion();
-      }
-    }, 1500);
-  }
+    // Background
+    ctx.fillStyle = '#0a1628';
+    ctx.fillRect(0, 0, w, h);
 
-  selectAnswer(selectedIndex) {
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    if (this.currentEnemy?.interval) clearInterval(this.currentEnemy.interval);
-    
-    const question = this.questions[this.currentQuestionIndex];
-    const options = document.querySelectorAll('.option-btn');
-    const isCorrect = selectedIndex === question.correct_answer;
-    
-    this.questionsAnswered++;
-    
-    options.forEach(opt => {
-      opt.style.pointerEvents = 'none';
-    });
-    
-    if (isCorrect) {
-      options[selectedIndex].classList.add('correct');
-      this.combo++;
-      this.correctAnswers++;
-      
-      if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-      
-      const timeBonus = Math.floor(this.timeLeft / 1000);
-      const comboBonus = this.combo * 10;
-      const baseScore = 100;
-      const totalPoints = baseScore + timeBonus + comboBonus;
-      
-      this.score += totalPoints;
-      this.enemiesDefeated++;
-      
-      const enemy = this.currentEnemy?.element;
-      if (enemy) {
-        const rect = enemy.getBoundingClientRect();
-        const gameRect = document.querySelector('.game-area').getBoundingClientRect();
-        const x = rect.left - gameRect.left + rect.width / 2;
-        const y = rect.top - gameRect.top + rect.height / 2;
-        
-        enemy.classList.add('dying');
-        this.createExplosion('💥', x, y);
-        this.createScorePopup('+' + totalPoints, x, y);
-        this.createParticles(x, y);
-      }
-      
-      if (this.combo >= 3) {
-        this.showCombo(this.combo);
-      }
-      
-      if (this.enemiesDefeated % 5 === 0) {
-        this.wave++;
-        this.enemySpeed += 0.15;
-      }
-      
-    } else {
-      options[selectedIndex].classList.add('wrong');
-      options[question.correct_answer].classList.add('correct');
-      this.combo = 0;
-      this.health -= 15;
-      
-      this.createExplosion('❌');
+    // Stars
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 50; i++) {
+      const x = (i * 137) % w;
+      const y = (i * 97) % h;
+      ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.001 + i) * 0.2;
+      ctx.fillRect(x, y, 1.5, 1.5);
     }
-    
-    this.updateHUD();
-    
-    setTimeout(() => {
-      if (this.health <= 0) {
-        this.endGame();
-      } else {
-        this.nextQuestion();
-      }
-    }, 1500);
-  }
+    ctx.globalAlpha = 1;
 
-  nextQuestion() {
-    this.currentQuestionIndex++;
-    
-    if (this.currentQuestionIndex >= this.questions.length) {
-      this.endGame();
-    } else {
-      this.startWave();
+    // Ground
+    ctx.fillStyle = '#1a3a1a';
+    ctx.fillRect(0, h - 60, w, 60);
+    ctx.fillStyle = '#2d5a2d';
+    for (let i = 0; i < w; i += 40) {
+      ctx.fillRect(i, h - 60, 2, 60);
     }
+
+    // Player
+    ctx.fillStyle = '#3498db';
+    ctx.beginPath();
+    ctx.moveTo(this.playerX, this.playerY - 25);
+    ctx.lineTo(this.playerX - 20, this.playerY + 15);
+    ctx.lineTo(this.playerX + 20, this.playerY + 15);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bullets
+    ctx.fillStyle = '#f1c40f';
+    this.bullets.forEach(bullet => {
+      ctx.fillRect(bullet.x - 3, bullet.y, bullet.width, bullet.height);
+      // Glow effect
+      ctx.shadowColor = '#f1c40f';
+      ctx.shadowBlur = 10;
+      ctx.fillRect(bullet.x - 3, bullet.y, bullet.width, bullet.height);
+      ctx.shadowBlur = 0;
+    });
+
+    // Enemies
+    this.enemies.forEach(enemy => {
+      if (!enemy.alive) return;
+      ctx.fillStyle = enemy.color;
+      ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(enemy.answer, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2 + 5);
+
+      // Border
+      ctx.strokeStyle = enemy.isCorrect ? '#2ecc71' : '#e74c3c';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(enemy.x, enemy.y, enemy.width, enemy.height);
+    });
+
+    // Particles
+    this.particles.forEach(p => {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    });
+    ctx.globalAlpha = 1;
   }
 
-  updateHUD() {
-    const scoreEl = document.getElementById('scoreValue');
-    const comboEl = document.getElementById('comboValue');
-    const waveEl = document.getElementById('waveValue');
-    const healthFill = document.getElementById('healthFill');
-    const defeatedEl = document.getElementById('defeatedValue');
-    
+  renderEnemies() {
+    // Called after showQuestion to sync enemy data
+  }
+
+  updateUI() {
+    const scoreEl = document.getElementById('scoreDisplay');
+    const comboEl = document.getElementById('comboDisplay');
+    const waveEl = document.getElementById('waveDisplay');
+    const defeatEl = document.getElementById('defeatDisplay');
+    const questionNumEl = document.getElementById('questionNum');
+    const progressBar = document.getElementById('progressBar');
+
     if (scoreEl) scoreEl.textContent = this.score;
-    if (comboEl) comboEl.textContent = this.combo + 'x';
+    if (comboEl) comboEl.textContent = `${this.combo}x`;
     if (waveEl) waveEl.textContent = this.wave;
-    if (defeatedEl) defeatedEl.textContent = this.enemiesDefeated;
-    if (healthFill) healthFill.style.width = Math.max(0, this.health) + '%';
-  }
+    if (defeatEl) defeatEl.textContent = this.defeats;
+    if (questionNumEl) questionNumEl.textContent = `SOAL ${this.currentQuestion} / ${this.totalQuestions}`;
 
-  createExplosion(emoji, x, y) {
-    const gameArea = document.querySelector('.game-area');
-    if (!gameArea) return;
-    
-    const explosion = document.createElement('div');
-    explosion.className = 'explosion';
-    explosion.textContent = emoji;
-    explosion.style.left = (x || gameArea.offsetWidth / 2) + 'px';
-    explosion.style.top = (y || gameArea.offsetHeight / 2) + 'px';
-    gameArea.appendChild(explosion);
-    
-    setTimeout(() => explosion.remove(), 800);
-  }
+    if (progressBar) {
+      const pct = (this.currentQuestion / this.totalQuestions) * 100;
+      progressBar.style.width = `${pct}%`;
+    }
 
-  createScorePopup(text, x, y) {
-    const gameArea = document.querySelector('.game-area');
-    if (!gameArea) return;
-    
-    const popup = document.createElement('div');
-    popup.className = 'score-popup';
-    popup.textContent = text;
-    popup.style.left = x + 'px';
-    popup.style.top = (y - 30) + 'px';
-    gameArea.appendChild(popup);
-    
-    setTimeout(() => popup.remove(), 1000);
-  }
-
-  createParticles(x, y) {
-    const gameArea = document.querySelector('.game-area');
-    if (!gameArea) return;
-    
-    const colors = ['#FF6584', '#6C63FF', '#00f5ff', '#39ff14', '#FFD600', '#ff00ff'];
-    
-    for (let i = 0; i < 12; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'particle';
-      particle.style.left = x + 'px';
-      particle.style.top = y + 'px';
-      particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-      particle.style.setProperty('--tx', (Math.random() - 0.5) * 200 + 'px');
-      particle.style.setProperty('--ty', (Math.random() - 0.5) * 200 + 'px');
-      gameArea.appendChild(particle);
-      
-      setTimeout(() => particle.remove(), 1000);
+    // Update local score bar
+    const localBar = document.getElementById('localScoreBar');
+    if (localBar) {
+      const pct = (this.score % 500) / 500 * 100;
+      localBar.style.width = `${pct}%`;
     }
   }
 
-  showCombo(combo) {
-    const indicator = document.createElement('div');
-    indicator.className = 'combo-indicator';
-    indicator.textContent = `🔥 ${combo}x COMBO! 🔥`;
-    document.body.appendChild(indicator);
-    
-    setTimeout(() => indicator.remove(), 1000);
-  }
-
-  async updateActiveGameInDB(question) {
-    try {
-      await DB.updateActiveGame(
-        this.sessionId,
-        this.playerName,
-        this.grade,
-        question.question,
-        question.topic,
-        question.options[question.correct_answer],
-        question.options,
-        question.solution || [],
-        question.quick_tip || '',
-        this.score
-      );
-    } catch (e) {
-      console.log('DB update skipped');
-    }
-  }
-
-  async endGame() {
+  gameOver() {
     this.gameActive = false;
-    
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    if (this.currentEnemy?.interval) clearInterval(this.currentEnemy.interval);
-    
-    const accuracy = this.questionsAnswered > 0 
-      ? Math.round((this.correctAnswers / this.questionsAnswered) * 100) 
-      : 0;
-    
-    try {
-      await DB.endGame(this.sessionId);
-      await DB.saveScore(this.playerName, this.grade, this.score, this.enemiesDefeated, accuracy, this.maxCombo, this.sessionId);
-    } catch (e) {
-      console.log('DB save skipped');
-    }
-    
-    this.showResults(accuracy);
-  }
+    sfx.playGameOver();
 
-  showResults(accuracy) {
-    this.showScreen('resultScreen');
-    
-    document.getElementById('resultScore').textContent = this.score;
-    document.getElementById('resultDefeated').textContent = this.enemiesDefeated;
-    document.getElementById('resultAccuracy').textContent = accuracy + '%';
-    document.getElementById('resultCombo').textContent = this.maxCombo + 'x';
-    
-    const resultEmoji = document.getElementById('resultEmoji');
-    const resultTitle = document.getElementById('resultTitle');
-    
-    if (accuracy >= 80) {
-      resultEmoji.textContent = '🏆';
-      resultTitle.textContent = 'LUAR BIASA!';
-    } else if (accuracy >= 60) {
-      resultEmoji.textContent = '⭐';
-      resultTitle.textContent = 'BAGUS!';
-    } else if (accuracy >= 40) {
-      resultEmoji.textContent = '💪';
-      resultTitle.textContent = 'TERUS BERLATIH!';
-    } else {
-      resultEmoji.textContent = '📚';
-      resultTitle.textContent = 'AYO BELAJAR LAGI!';
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      const finalScore = document.getElementById('finalScore');
+      if (finalScore) finalScore.textContent = this.score;
     }
   }
 
-  restartGame() {
-    this.sessionId = this.generateSessionId();
-    this.showScreen('menuScreen');
+  endGame() {
+    this.gameActive = false;
+    sfx.playCorrect();
+
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      const finalScore = document.getElementById('finalScore');
+      if (finalScore) finalScore.textContent = this.score;
+      const endTitle = document.getElementById('endTitle');
+      if (endTitle) endTitle.textContent = '🎉 SELESAI!';
+    }
   }
 
-  async showLeaderboard() {
-    this.showScreen('leaderboardScreen');
-    
-    const listEl = document.getElementById('leaderboardList');
-    if (!listEl) return;
-    
-    listEl.innerHTML = '<li class="loading"><div class="loading-spinner"></div><p>Memuat...</p></li>';
-    
-    try {
-      const { data } = await DB.getLeaderboard();
-      
-      if (data && data.length > 0) {
-        listEl.innerHTML = data.map((item, index) => {
-          const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
-          const topClass = index < 3 ? `top-${index + 1}` : '';
-          const gradeLabel = item.grade === 'all' ? 'Semua Kelas' : `Kelas ${item.grade}`;
-          
-          return `
-            <li class="leaderboard-item ${topClass}">
-              <span class="rank">${rankEmoji}</span>
-              <div class="player-info">
-                <div class="player-name-lb">${item.player_name}</div>
-                <div class="player-grade">${gradeLabel} | Akurasi ${item.accuracy || 0}% | Combo ${item.max_combo || 0}x</div>
-              </div>
-              <span class="player-score-lb">${item.score}</span>
-            </li>
-          `;
-        }).join('');
-      } else {
-        listEl.innerHTML = '<div class="no-games"><div class="no-games-emoji">🎮</div><p>Belum ada skor. Jadilah yang pertama!</p></div>';
-      }
-    } catch (e) {
-      listEl.innerHTML = '<div class="no-games"><div class="no-games-emoji">📡</div><p>Mode offline - leaderboard tidak tersedia</p></div>';
-    }
+  restart() {
+    this.score = 0;
+    this.combo = 0;
+    this.wave = 1;
+    this.defeats = 0;
+    this.currentQuestion = 0;
+    this.enemies = [];
+    this.bullets = [];
+    this.particles = [];
+    this.gameActive = true;
+    this.answerChoices = [];
+    this.waveEnemies = [];
+
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.style.display = 'none';
+
+    sfx.playButton();
+    this.nextQuestion();
+  }
+
+  gameLoop() {
+    this.update();
+    this.render();
+    requestAnimationFrame(() => this.gameLoop());
   }
 }
 
+// Start game when DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-  window.game = new MathShooterGame();
+  const game = new MathShooterGame();
+
+  // Restart button
+  const restartBtn = document.getElementById('restartBtn');
+  if (restartBtn) {
+    restartBtn.addEventListener('click', () => {
+      sfx.playButton();
+      game.restart();
+    });
+  }
 });
