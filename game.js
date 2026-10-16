@@ -79,13 +79,22 @@ class SFXManager {
     this.init();
     this.playTone(600, 0.05, 'sine', 0.1);
   }
+
+  playStartGame() {
+    this.init();
+    [262, 330, 392, 523].forEach((freq, i) => {
+      setTimeout(() => this.playTone(freq, 0.15, 'sine', 0.12), i * 120);
+    });
+  }
 }
 
 const sfx = new SFXManager();
 
 // ==================== MATH SHOOTER GAME ====================
 class MathShooterGame {
-  constructor() {
+  constructor(playerName, category) {
+    this.playerName = playerName || 'Player';
+    this.category = category || 'SEMUA KELAS';
     this.score = 0;
     this.combo = 0;
     this.wave = 1;
@@ -99,28 +108,31 @@ class MathShooterGame {
     this.ctx = null;
     this.playerX = 400;
     this.playerY = 500;
-    this.gameActive = true;
+    this.gameActive = false;
     this.questionData = null;
-    this.answerChoices = []; // ← PENTING: inisialisasi array
+    this.answerChoices = [];
     this.waveEnemies = [];
     this.waveIndex = 0;
     this.keys = {};
     this.lastShot = 0;
     this.shootCooldown = 250;
-
-    this.init();
+    this.animFrameId = null;
   }
 
   init() {
     this.canvas = document.getElementById('gameCanvas');
     if (!this.canvas) {
       console.error('Canvas tidak ditemukan!');
-      return;
+      return false;
     }
     this.ctx = this.canvas.getContext('2d');
+    this.canvas.width = 800;
+    this.canvas.height = 600;
     this.setupEventListeners();
+    this.gameActive = true;
     this.nextQuestion();
     this.gameLoop();
+    return true;
   }
 
   setupEventListeners() {
@@ -130,34 +142,24 @@ class MathShooterGame {
         e.preventDefault();
         this.shoot();
       }
-      // SFX: tombol tekan
       sfx.init();
     });
     document.addEventListener('keyup', (e) => {
       this.keys[e.key] = false;
     });
-
-    // Inisialisasi audio saat klik pertama
     document.addEventListener('click', () => sfx.init(), { once: true });
   }
 
   generateQuestion() {
     const topics = ['nilai_tempat', 'penjumlahan', 'pengurangan', 'perkalian', 'pembagian'];
     const topic = topics[Math.floor(Math.random() * topics.length)];
-
     switch (topic) {
-      case 'nilai_tempat':
-        return this.generateNilaiTempat();
-      case 'penjumlahan':
-        return this.generatePenjumlahan();
-      case 'pengurangan':
-        return this.generatePengurangan();
-      case 'perkalian':
-        return this.generatePerkalian();
-      case 'pembagian':
-        return this.generatePembagian();
-      default:
-        return this.generatePenjumlahan();
+      case 'nilai_tempat': return this.generateNilaiTempat();
+      case 'penjumlahan': return this.generatePenjumlahan();
+      case 'pengurangan': return this.generatePengurangan();
+      case 'perkalian': return this.generatePerkalian();
+      case 'pembagian': return this.generatePembagian();
+      default: return this.generatePenjumlahan();
     }
   }
 
@@ -257,15 +259,11 @@ class MathShooterGame {
       this.endGame();
       return;
     }
-
     this.questionData = this.generateQuestion();
-
-    // PERBAIKAN: Pastikan answerChoices selalu array valid
     this.answerChoices = this.questionData.choices || [];
     if (!Array.isArray(this.answerChoices) || this.answerChoices.length === 0) {
       this.answerChoices = ['A', 'B', 'C', 'D'];
     }
-
     this.updateUI();
     this.startWave();
   }
@@ -273,13 +271,9 @@ class MathShooterGame {
   startWave() {
     this.waveEnemies = [];
     sfx.playWaveStart();
-
-    // PERBAIKAN: Pastikan answerChoices ada sebelum forEach
     if (!this.answerChoices || !Array.isArray(this.answerChoices)) {
-      console.error('answerChoices tidak valid:', this.answerChoices);
       this.answerChoices = ['A', 'B', 'C', 'D'];
     }
-
     this.answerChoices.forEach((choice, index) => {
       const enemy = {
         x: 100 + index * 180,
@@ -294,7 +288,6 @@ class MathShooterGame {
       };
       this.waveEnemies.push(enemy);
     });
-
     this.enemies = [...this.waveEnemies];
     this.showQuestion();
   }
@@ -302,45 +295,14 @@ class MathShooterGame {
   showQuestion() {
     const questionEl = document.getElementById('questionText');
     const topicEl = document.getElementById('topicLabel');
-
     if (questionEl) questionEl.textContent = this.questionData.text;
     if (topicEl) topicEl.textContent = this.questionData.topic;
-
-    // PERBAIKAN UTAMA: Cek sebelum forEach
     this.answerChoices = this.answerChoices || [];
-
     this.answerChoices.forEach((choice, index) => {
       const enemy = this.waveEnemies[index];
       if (enemy) {
         enemy.answer = choice;
         enemy.isCorrect = (choice === this.questionData.answer);
-      }
-    });
-
-    // Update enemy labels di canvas
-    this.renderEnemies();
-  }
-
-  spawnEnemy() {
-    // PERBAIKAN: Pastikan answerChoices ada
-    if (!this.answerChoices || !Array.isArray(this.answerChoices)) {
-      this.answerChoices = this.questionData?.choices || ['A', 'B', 'C', 'D'];
-    }
-
-    this.answerChoices.forEach((choice, index) => {
-      const existing = this.waveEnemies.find(e => e.answer === choice);
-      if (!existing) {
-        this.waveEnemies.push({
-          x: 100 + index * 180,
-          y: -50,
-          width: 80,
-          height: 50,
-          speed: 0.5 + Math.random() * 0.5,
-          answer: choice,
-          isCorrect: choice === this.questionData.answer,
-          alive: true,
-          color: this.getEnemyColor(index)
-        });
       }
     });
   }
@@ -351,12 +313,11 @@ class MathShooterGame {
   }
 
   shoot() {
+    if (!this.gameActive) return;
     const now = Date.now();
     if (now - this.lastShot < this.shootCooldown) return;
     this.lastShot = now;
-
     sfx.playShoot();
-
     this.bullets.push({
       x: this.playerX,
       y: this.playerY - 20,
@@ -368,19 +329,15 @@ class MathShooterGame {
 
   update() {
     if (!this.gameActive) return;
-
-    // Player movement
     if (this.keys['ArrowLeft'] || this.keys['a']) this.playerX -= 5;
     if (this.keys['ArrowRight'] || this.keys['d']) this.playerX += 5;
     this.playerX = Math.max(30, Math.min(this.canvas.width - 30, this.playerX));
 
-    // Update bullets
     this.bullets = this.bullets.filter(bullet => {
       bullet.y -= bullet.speed;
       return bullet.y > -20;
     });
 
-    // Update enemies
     this.enemies.forEach(enemy => {
       if (enemy.alive) {
         enemy.y += enemy.speed;
@@ -396,7 +353,6 @@ class MathShooterGame {
       }
     });
 
-    // Collision detection
     this.bullets.forEach(bullet => {
       this.enemies.forEach(enemy => {
         if (!enemy.alive) return;
@@ -409,7 +365,6 @@ class MathShooterGame {
           bullet.y = -100;
           enemy.alive = false;
           sfx.playEnemyHit();
-
           if (enemy.isCorrect) {
             this.combo++;
             const comboMultiplier = Math.min(this.combo, 5);
@@ -417,7 +372,6 @@ class MathShooterGame {
             sfx.playCorrect();
             if (this.combo >= 3) sfx.playCombo();
             this.createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#2ecc71');
-
             setTimeout(() => this.nextQuestion(), 1000);
           } else {
             this.combo = 0;
@@ -430,7 +384,6 @@ class MathShooterGame {
       });
     });
 
-    // Update particles
     this.particles = this.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
@@ -439,10 +392,7 @@ class MathShooterGame {
       return p.life > 0;
     });
 
-    // Check game over
-    if (this.defeats >= 5) {
-      this.gameOver();
-    }
+    if (this.defeats >= 5) this.gameOver();
   }
 
   createParticles(x, y, color) {
@@ -464,11 +414,9 @@ class MathShooterGame {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // Background
     ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, w, h);
 
-    // Stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 50; i++) {
       const x = (i * 137) % w;
@@ -478,7 +426,6 @@ class MathShooterGame {
     }
     ctx.globalAlpha = 1;
 
-    // Ground
     ctx.fillStyle = '#1a3a1a';
     ctx.fillRect(0, h - 60, w, 60);
     ctx.fillStyle = '#2d5a2d';
@@ -486,7 +433,6 @@ class MathShooterGame {
       ctx.fillRect(i, h - 60, 2, 60);
     }
 
-    // Player
     ctx.fillStyle = '#3498db';
     ctx.beginPath();
     ctx.moveTo(this.playerX, this.playerY - 25);
@@ -495,18 +441,14 @@ class MathShooterGame {
     ctx.closePath();
     ctx.fill();
 
-    // Bullets
     ctx.fillStyle = '#f1c40f';
     this.bullets.forEach(bullet => {
-      ctx.fillRect(bullet.x - 3, bullet.y, bullet.width, bullet.height);
-      // Glow effect
       ctx.shadowColor = '#f1c40f';
       ctx.shadowBlur = 10;
       ctx.fillRect(bullet.x - 3, bullet.y, bullet.width, bullet.height);
       ctx.shadowBlur = 0;
     });
 
-    // Enemies
     this.enemies.forEach(enemy => {
       if (!enemy.alive) return;
       ctx.fillStyle = enemy.color;
@@ -515,24 +457,17 @@ class MathShooterGame {
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
       ctx.fillText(enemy.answer, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2 + 5);
-
-      // Border
       ctx.strokeStyle = enemy.isCorrect ? '#2ecc71' : '#e74c3c';
       ctx.lineWidth = 2;
       ctx.strokeRect(enemy.x, enemy.y, enemy.width, enemy.height);
     });
 
-    // Particles
     this.particles.forEach(p => {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     });
     ctx.globalAlpha = 1;
-  }
-
-  renderEnemies() {
-    // Called after showQuestion to sync enemy data
   }
 
   updateUI() {
@@ -548,24 +483,15 @@ class MathShooterGame {
     if (waveEl) waveEl.textContent = this.wave;
     if (defeatEl) defeatEl.textContent = this.defeats;
     if (questionNumEl) questionNumEl.textContent = `SOAL ${this.currentQuestion} / ${this.totalQuestions}`;
-
     if (progressBar) {
       const pct = (this.currentQuestion / this.totalQuestions) * 100;
       progressBar.style.width = `${pct}%`;
-    }
-
-    // Update local score bar
-    const localBar = document.getElementById('localScoreBar');
-    if (localBar) {
-      const pct = (this.score % 500) / 500 * 100;
-      localBar.style.width = `${pct}%`;
     }
   }
 
   gameOver() {
     this.gameActive = false;
     sfx.playGameOver();
-
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) {
       overlay.style.display = 'flex';
@@ -577,7 +503,6 @@ class MathShooterGame {
   endGame() {
     this.gameActive = false;
     sfx.playCorrect();
-
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) {
       overlay.style.display = 'flex';
@@ -600,31 +525,75 @@ class MathShooterGame {
     this.gameActive = true;
     this.answerChoices = [];
     this.waveEnemies = [];
-
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) overlay.style.display = 'none';
-
     sfx.playButton();
     this.nextQuestion();
   }
 
+  destroy() {
+    this.gameActive = false;
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+    }
+  }
+
   gameLoop() {
+    if (!this.gameActive) return;
     this.update();
     this.render();
-    requestAnimationFrame(() => this.gameLoop());
+    this.animFrameId = requestAnimationFrame(() => this.gameLoop());
   }
 }
 
-// Start game when DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  const game = new MathShooterGame();
+// ==================== APP CONTROLLER ====================
+let game = null;
 
-  // Restart button
+document.addEventListener('DOMContentLoaded', () => {
+  const startScreen = document.getElementById('startScreen');
+  const gameScreen = document.getElementById('gameScreen');
+  const startBtn = document.getElementById('startBtn');
+  const playerNameInput = document.getElementById('playerName');
+  const categorySelect = document.getElementById('categorySelect');
   const restartBtn = document.getElementById('restartBtn');
+  const backToMenuBtn = document.getElementById('backToMenuBtn');
+
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      sfx.playStartGame();
+      const playerName = playerNameInput?.value?.trim() || 'Player';
+      const category = categorySelect?.value || 'SEMUA KELAS';
+      if (startScreen) startScreen.style.display = 'none';
+      if (gameScreen) gameScreen.style.display = 'block';
+      setTimeout(() => {
+        game = new MathShooterGame(playerName, category);
+        const success = game.init();
+        if (!success) {
+          console.error('Gagal menginisialisasi game!');
+          alert('Gagal memuat game. Refresh halaman.');
+        }
+      }, 100);
+    });
+  }
+
   if (restartBtn) {
     restartBtn.addEventListener('click', () => {
       sfx.playButton();
-      game.restart();
+      if (game) game.restart();
     });
   }
+
+  if (backToMenuBtn) {
+    backToMenuBtn.addEventListener('click', () => {
+      sfx.playButton();
+      if (game) game.destroy();
+      game = null;
+      if (gameScreen) gameScreen.style.display = 'none';
+      if (startScreen) startScreen.style.display = 'block';
+      const overlay = document.getElementById('gameOverOverlay');
+      if (overlay) overlay.style.display = 'none';
+    });
+  }
+
+  document.addEventListener('click', () => sfx.init(), { once: true });
 });
