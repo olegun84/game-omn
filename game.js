@@ -86,6 +86,12 @@ class SFXManager {
       setTimeout(() => this.playTone(freq, 0.15, 'sine', 0.12), i * 120);
     });
   }
+
+  playTimeout() {
+    this.init();
+    this.playTone(400, 0.1, 'triangle', 0.1);
+    setTimeout(() => this.playTone(300, 0.15, 'triangle', 0.1), 100);
+  }
 }
 
 const sfx = new SFXManager();
@@ -107,16 +113,19 @@ class MathShooterGame {
     this.canvas = null;
     this.ctx = null;
     this.playerX = 400;
-    this.playerY = 500;
+    this.playerY = 540;
     this.gameActive = false;
     this.questionData = null;
     this.answerChoices = [];
     this.waveEnemies = [];
-    this.waveIndex = 0;
     this.keys = {};
     this.lastShot = 0;
     this.shootCooldown = 250;
     this.animFrameId = null;
+    this.questionTimeout = null;
+    this.questionTimeLimit = 15000; // 15 detik per soal
+    this.timeRemaining = 15;
+    this.timerInterval = null;
   }
 
   init() {
@@ -126,8 +135,14 @@ class MathShooterGame {
       return false;
     }
     this.ctx = this.canvas.getContext('2d');
+
+    // Set canvas size yang proper
     this.canvas.width = 800;
     this.canvas.height = 600;
+
+    this.playerX = this.canvas.width / 2;
+    this.playerY = this.canvas.height - 80;
+
     this.setupEventListeners();
     this.gameActive = true;
     this.nextQuestion();
@@ -259,44 +274,145 @@ class MathShooterGame {
       this.endGame();
       return;
     }
+
     this.questionData = this.generateQuestion();
     this.answerChoices = this.questionData.choices || [];
     if (!Array.isArray(this.answerChoices) || this.answerChoices.length === 0) {
       this.answerChoices = ['A', 'B', 'C', 'D'];
     }
+
     this.updateUI();
     this.startWave();
+    this.startQuestionTimer();
+  }
+
+  startQuestionTimer() {
+    this.clearQuestionTimer();
+    this.timeRemaining = 15;
+    this.updateTimerDisplay();
+
+    this.timerInterval = setInterval(() => {
+      this.timeRemaining--;
+      this.updateTimerDisplay();
+
+      if (this.timeRemaining <= 0) {
+        this.clearQuestionTimer();
+        this.handleTimeout();
+      }
+    }, 1000);
+  }
+
+  clearQuestionTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  updateTimerDisplay() {
+    const timerEl = document.getElementById('timerDisplay');
+    if (timerEl) {
+      timerEl.textContent = `⏱️ ${this.timeRemaining}s`;
+      timerEl.style.color = this.timeRemaining <= 5 ? '#e74c3c' : '#00ff88';
+    }
+  }
+
+  handleTimeout() {
+    // Auto-resolve: soal tidak terjawab, anggap salah
+    sfx.playTimeout();
+    this.combo = 0;
+    this.defeats++;
+    this.updateUI();
+
+    // Hapus semua enemy yang masih alive
+    this.enemies.forEach(enemy => {
+      if (enemy.alive) {
+        enemy.alive = false;
+        this.createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#e74c3c');
+      }
+    });
+
+    // Tampilkan pesan timeout
+    this.showTimeoutMessage();
+
+    // Lanjut ke soal berikutnya setelah delay
+    setTimeout(() => {
+      this.hideTimeoutMessage();
+      this.nextQuestion();
+    }, 2000);
+  }
+
+  showTimeoutMessage() {
+    let msgEl = document.getElementById('timeoutMessage');
+    if (!msgEl) {
+      msgEl = document.createElement('div');
+      msgEl.id = 'timeoutMessage';
+      msgEl.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(231, 76, 60, 0.9);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 12px;
+        font-size: 1.5rem;
+        font-weight: bold;
+        z-index: 100;
+        pointer-events: none;
+      `;
+      this.canvas.parentElement.style.position = 'relative';
+      this.canvas.parentElement.appendChild(msgEl);
+    }
+    msgEl.textContent = '⏰ WAKTU HABIS!';
+    msgEl.style.display = 'block';
+  }
+
+  hideTimeoutMessage() {
+    const msgEl = document.getElementById('timeoutMessage');
+    if (msgEl) msgEl.style.display = 'none';
   }
 
   startWave() {
     this.waveEnemies = [];
+    this.enemies = [];
     sfx.playWaveStart();
+
     if (!this.answerChoices || !Array.isArray(this.answerChoices)) {
       this.answerChoices = ['A', 'B', 'C', 'D'];
     }
+
+    // Spawn enemies dengan posisi yang terlihat
+    const canvasWidth = this.canvas.width;
+    const spacing = canvasWidth / (this.answerChoices.length + 1);
+
     this.answerChoices.forEach((choice, index) => {
       const enemy = {
-        x: 100 + index * 180,
-        y: -50 - Math.random() * 200,
+        x: spacing * (index + 1) - 40,
+        y: 80 + Math.random() * 100, // Mulai dari atas, terlihat jelas
         width: 80,
-        height: 50,
-        speed: 0.5 + Math.random() * 0.5,
+        height: 60,
+        speed: 0.3 + Math.random() * 0.3,
         answer: choice,
         isCorrect: choice === this.questionData.answer,
         alive: true,
-        color: this.getEnemyColor(index)
+        color: this.getEnemyColor(index),
+        bounceOffset: Math.random() * Math.PI * 2
       };
       this.waveEnemies.push(enemy);
+      this.enemies.push(enemy);
     });
-    this.enemies = [...this.waveEnemies];
+
     this.showQuestion();
   }
 
   showQuestion() {
     const questionEl = document.getElementById('questionText');
     const topicEl = document.getElementById('topicLabel');
+
     if (questionEl) questionEl.textContent = this.questionData.text;
     if (topicEl) topicEl.textContent = this.questionData.topic;
+
     this.answerChoices = this.answerChoices || [];
     this.answerChoices.forEach((choice, index) => {
       const enemy = this.waveEnemies[index];
@@ -318,6 +434,7 @@ class MathShooterGame {
     if (now - this.lastShot < this.shootCooldown) return;
     this.lastShot = now;
     sfx.playShoot();
+
     this.bullets.push({
       x: this.playerX,
       y: this.playerY - 20,
@@ -329,30 +446,43 @@ class MathShooterGame {
 
   update() {
     if (!this.gameActive) return;
+
+    // Player movement
     if (this.keys['ArrowLeft'] || this.keys['a']) this.playerX -= 5;
     if (this.keys['ArrowRight'] || this.keys['d']) this.playerX += 5;
     this.playerX = Math.max(30, Math.min(this.canvas.width - 30, this.playerX));
 
+    // Update bullets
     this.bullets = this.bullets.filter(bullet => {
       bullet.y -= bullet.speed;
       return bullet.y > -20;
     });
 
+    // Update enemies - bergerak turun perlahan
     this.enemies.forEach(enemy => {
       if (enemy.alive) {
         enemy.y += enemy.speed;
-        if (enemy.y > this.canvas.height + 50) {
+        enemy.bounceOffset += 0.05;
+
+        // Jika enemy jatuh sampai bawah, anggap tidak terjawab
+        if (enemy.y > this.canvas.height - 60) {
           enemy.alive = false;
           if (enemy.isCorrect) {
+            // Jawaban benar jatuh = pemain kalah
             this.defeats++;
             this.combo = 0;
             sfx.playWrong();
             this.updateUI();
+
+            // Auto next question
+            setTimeout(() => this.nextQuestion(), 1000);
           }
         }
       }
     });
 
+    // Collision detection
+    let correctHit = false;
     this.bullets.forEach(bullet => {
       this.enemies.forEach(enemy => {
         if (!enemy.alive) return;
@@ -365,13 +495,18 @@ class MathShooterGame {
           bullet.y = -100;
           enemy.alive = false;
           sfx.playEnemyHit();
+
           if (enemy.isCorrect) {
+            correctHit = true;
             this.combo++;
             const comboMultiplier = Math.min(this.combo, 5);
             this.score += 100 * comboMultiplier;
             sfx.playCorrect();
             if (this.combo >= 3) sfx.playCombo();
             this.createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#2ecc71');
+
+            // Clear timer dan lanjut soal berikutnya
+            this.clearQuestionTimer();
             setTimeout(() => this.nextQuestion(), 1000);
           } else {
             this.combo = 0;
@@ -384,6 +519,7 @@ class MathShooterGame {
       });
     });
 
+    // Update particles
     this.particles = this.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
@@ -392,7 +528,10 @@ class MathShooterGame {
       return p.life > 0;
     });
 
-    if (this.defeats >= 5) this.gameOver();
+    // Check game over
+    if (this.defeats >= 5) {
+      this.gameOver();
+    }
   }
 
   createParticles(x, y, color) {
@@ -414,9 +553,11 @@ class MathShooterGame {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
+    // Background
     ctx.fillStyle = '#0a1628';
     ctx.fillRect(0, 0, w, h);
 
+    // Stars
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 50; i++) {
       const x = (i * 137) % w;
@@ -426,6 +567,7 @@ class MathShooterGame {
     }
     ctx.globalAlpha = 1;
 
+    // Ground
     ctx.fillStyle = '#1a3a1a';
     ctx.fillRect(0, h - 60, w, 60);
     ctx.fillStyle = '#2d5a2d';
@@ -433,6 +575,7 @@ class MathShooterGame {
       ctx.fillRect(i, h - 60, 2, 60);
     }
 
+    // Player (triangle)
     ctx.fillStyle = '#3498db';
     ctx.beginPath();
     ctx.moveTo(this.playerX, this.playerY - 25);
@@ -441,6 +584,7 @@ class MathShooterGame {
     ctx.closePath();
     ctx.fill();
 
+    // Bullets
     ctx.fillStyle = '#f1c40f';
     this.bullets.forEach(bullet => {
       ctx.shadowColor = '#f1c40f';
@@ -449,19 +593,31 @@ class MathShooterGame {
       ctx.shadowBlur = 0;
     });
 
+    // Enemies (kotak dengan jawaban)
     this.enemies.forEach(enemy => {
       if (!enemy.alive) return;
+
+      // Bounce effect
+      const bounceY = Math.sin(enemy.bounceOffset) * 3;
+
+      // Enemy body
       ctx.fillStyle = enemy.color;
-      ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(enemy.answer, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2 + 5);
+      ctx.fillRect(enemy.x, enemy.y + bounceY, enemy.width, enemy.height);
+
+      // Border
       ctx.strokeStyle = enemy.isCorrect ? '#2ecc71' : '#e74c3c';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(enemy.x, enemy.y + bounceY, enemy.width, enemy.height);
+
+      // Answer text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(enemy.answer, enemy.x + enemy.width / 2, enemy.y + bounceY + enemy.height / 2);
     });
 
+    // Particles
     this.particles.forEach(p => {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
@@ -483,6 +639,7 @@ class MathShooterGame {
     if (waveEl) waveEl.textContent = this.wave;
     if (defeatEl) defeatEl.textContent = this.defeats;
     if (questionNumEl) questionNumEl.textContent = `SOAL ${this.currentQuestion} / ${this.totalQuestions}`;
+
     if (progressBar) {
       const pct = (this.currentQuestion / this.totalQuestions) * 100;
       progressBar.style.width = `${pct}%`;
@@ -491,25 +648,31 @@ class MathShooterGame {
 
   gameOver() {
     this.gameActive = false;
+    this.clearQuestionTimer();
     sfx.playGameOver();
-    const overlay = document.getElementById('gameOverOverlay');
-    if (overlay) {
-      overlay.style.display = 'flex';
-      const finalScore = document.getElementById('finalScore');
-      if (finalScore) finalScore.textContent = this.score;
-    }
-  }
 
-  endGame() {
-    this.gameActive = false;
-    sfx.playCorrect();
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) {
       overlay.style.display = 'flex';
       const finalScore = document.getElementById('finalScore');
       if (finalScore) finalScore.textContent = this.score;
       const endTitle = document.getElementById('endTitle');
-      if (endTitle) endTitle.textContent = '🎉 SELESAI!';
+      if (endTitle) endTitle.textContent = '💀 GAME OVER';
+    }
+  }
+
+  endGame() {
+    this.gameActive = false;
+    this.clearQuestionTimer();
+    sfx.playCorrect();
+
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      const finalScore = document.getElementById('finalScore');
+      if (finalScore) finalScore.textContent = this.score;
+      const endTitle = document.getElementById('endTitle');
+      if (endTitle) endTitle.textContent = ' SELESAI!';
     }
   }
 
@@ -525,14 +688,20 @@ class MathShooterGame {
     this.gameActive = true;
     this.answerChoices = [];
     this.waveEnemies = [];
+    this.playerX = this.canvas.width / 2;
+
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) overlay.style.display = 'none';
+
+    this.hideTimeoutMessage();
     sfx.playButton();
     this.nextQuestion();
   }
 
   destroy() {
     this.gameActive = false;
+    this.clearQuestionTimer();
+    this.hideTimeoutMessage();
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
     }
@@ -563,8 +732,10 @@ document.addEventListener('DOMContentLoaded', () => {
       sfx.playStartGame();
       const playerName = playerNameInput?.value?.trim() || 'Player';
       const category = categorySelect?.value || 'SEMUA KELAS';
+
       if (startScreen) startScreen.style.display = 'none';
       if (gameScreen) gameScreen.style.display = 'block';
+
       setTimeout(() => {
         game = new MathShooterGame(playerName, category);
         const success = game.init();
@@ -588,8 +759,10 @@ document.addEventListener('DOMContentLoaded', () => {
       sfx.playButton();
       if (game) game.destroy();
       game = null;
+
       if (gameScreen) gameScreen.style.display = 'none';
       if (startScreen) startScreen.style.display = 'block';
+
       const overlay = document.getElementById('gameOverOverlay');
       if (overlay) overlay.style.display = 'none';
     });
