@@ -8,21 +8,21 @@
 </head>
 <body>
 
-  <!-- ==================== START SCREEN ==================== -->
+  <!-- START SCREEN -->
   <div id="startScreen">
     <div class="start-container">
       <div class="zombie-icon">🧟</div>
       <h1 class="game-title">MATH <span class="title-shoot">SHOOTER</span></h1>
-      <p class="subtitle">Tembak Zombie & Helikopter dengan Matematika! 🎯</p>
+      <p class="subtitle">Tembak Zombie & Helikopter dengan Matematika! </p>
       <p class="subtitle-small">OMN 2026 Edition - Soal Tak Terbatas</p>
 
       <div class="form-group">
-        <label> Nama Pemain</label>
+        <label>👤 Nama Pemain</label>
         <input type="text" id="playerName" placeholder="Masukkan nama..." value="opik">
       </div>
 
       <div class="form-group">
-        <label>📚 Pilih Kategori</label>
+        <label> Pilih Kategori</label>
         <select id="categorySelect">
           <option value="SEMUA KELAS">🎲 SEMUA KELAS (Campuran)</option>
           <option value="KELAS 1">Kelas 1</option>
@@ -37,7 +37,7 @@
     </div>
   </div>
 
-  <!-- ==================== GAME SCREEN ==================== -->
+  <!-- GAME SCREEN -->
   <div id="gameScreen" style="display: none;">
     <!-- HUD -->
     <div class="hud">
@@ -45,6 +45,7 @@
       <div class="hud-item">🔥 Combo: <strong id="comboDisplay">0x</strong></div>
       <div class="hud-item">🌊 Wave: <strong id="waveDisplay">1</strong></div>
       <div class="hud-item">💀 Kalah: <strong id="defeatDisplay">0</strong></div>
+      <div class="hud-item" id="timerDisplay">⏱️ 15s</div>
     </div>
 
     <!-- Progress Bar -->
@@ -55,8 +56,10 @@
     <!-- Question Number -->
     <div id="questionNum" class="question-num">SOAL 1 / 15</div>
 
-    <!-- Canvas -->
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <!-- Canvas Container -->
+    <div class="canvas-container">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
 
     <!-- Question Box -->
     <div id="questionBox" class="question-box">
@@ -67,11 +70,11 @@
     <!-- Game Over Overlay -->
     <div id="gameOverOverlay" class="overlay" style="display: none;">
       <div class="overlay-content">
-        <h2 id="endTitle">💀 GAME OVER</h2>
+        <h2 id="endTitle"> GAME OVER</h2>
         <p class="final-score-text">Skor Akhir: <strong id="finalScore">0</strong></p>
         <div class="overlay-buttons">
           <button id="restartBtn" class="btn-restart">🔄 MAIN LAGI</button>
-          <button id="backToMenuBtn" class="btn-menu">🏠 KEMBALI KE MENU</button>
+          <button id="backToMenuBtn" class="btn-menu"> KEMBALI KE MENU</button>
         </div>
       </div>
     </div>
