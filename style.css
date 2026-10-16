@@ -12,7 +12,7 @@ body {
   overflow-x: hidden;
 }
 
-/* ==================== START SCREEN ==================== */
+/* START SCREEN */
 #startScreen {
   display: flex;
   justify-content: center;
@@ -46,10 +46,6 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin-bottom: 10px;
-}
-
-.title-shoot {
-  color: #ff00ff;
 }
 
 .subtitle {
@@ -160,7 +156,7 @@ body {
   border-color: #00f5ff;
 }
 
-/* ==================== GAME SCREEN ==================== */
+/* GAME SCREEN */
 #gameScreen {
   display: flex;
   flex-direction: column;
@@ -172,7 +168,7 @@ body {
 .hud {
   display: flex;
   justify-content: center;
-  gap: 30px;
+  gap: 20px;
   flex-wrap: wrap;
   background: rgba(10, 22, 40, 0.9);
   border: 1px solid #2a3a5a;
@@ -221,12 +217,18 @@ body {
   border: 1px solid #ff00ff;
 }
 
+.canvas-container {
+  position: relative;
+  margin-bottom: 10px;
+}
+
 #gameCanvas {
   border: 2px solid #2a3a5a;
   border-radius: 12px;
   background: #0a1628;
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
 .question-box {
@@ -257,7 +259,7 @@ body {
   color: #ffffff;
 }
 
-/* ==================== OVERLAY ==================== */
+/* OVERLAY */
 .overlay {
   position: fixed;
   top: 0;
@@ -336,7 +338,7 @@ body {
   border-color: #00f5ff;
 }
 
-/* ==================== RESPONSIVE ==================== */
+/* RESPONSIVE */
 @media (max-width: 600px) {
   .game-title {
     font-size: 2.5rem;
