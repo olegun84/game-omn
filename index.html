@@ -1,157 +1,82 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>🧟 Math Shooter - OMN 2026</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Shooter - OMN 2026</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="bg-animation"></div>
-    <div class="stars"></div>
 
-    <!-- MENU SCREEN -->
-    <div id="menuScreen" class="screen active">
-        <div class="zombie-emoji">🧟</div>
-        <h1 class="game-title">MATH SHOOTER</h1>
-        <p class="game-subtitle">Tembak Zombie & Helikopter dengan Matematika! 🎯<br>OMN 2026 Edition - Soal Tak Terbatas</p>
-        
-        <div class="input-group">
-            <label>👤 Nama Pemain</label>
-            <input type="text" id="playerName" placeholder="Masukkan nama kamu..." maxlength="20">
-        </div>
-        
-        <div class="input-group">
-            <label>📚 Pilih Kategori</label>
-            <select id="gradeSelect">
-                <option value="all">🎲 SEMUA KELAS (Campuran)</option>
-                <optgroup label="📗 SD">
-                    <option value="1">Kelas 1 - Pola & Cerita</option>
-                    <option value="2">Kelas 2 - Perkalian</option>
-                    <option value="3">Kelas 3 - Operasi Campuran</option>
-                    <option value="4">Kelas 4 - Pecahan & Geometri</option>
-                    <option value="5">Kelas 5 - FPB, KPK & Volume</option>
-                    <option value="6">Kelas 6 - Rasio & Aljabar</option>
-                </optgroup>
-                <optgroup label="📘 SMP">
-                    <option value="7">Kelas 7 - Bilangan Bulat & PLSV</option>
-                    <option value="8">Kelas 8 - SPLDV & Pythagoras</option>
-                    <option value="9">Kelas 9 - Kuadrat & Trigonometri</option>
-                </optgroup>
-            </select>
-        </div>
-        
-        <button class="btn btn-primary" id="startBtn">🚀 MULAI BERMAIN</button>
-        
-        <br><br>
-        
-        <button class="btn btn-warning" id="leaderboardBtn" style="font-size: 0.9rem; padding: 10px 25px;">
-            🏆 LEADERBOARD
-        </button>
-        
-        <br><br>
-        
-        <a href="teacher.html" style="color: #aaa; text-decoration: none; font-size: 0.9rem;">
-            👨‍🏫 Mode Guru
-        </a>
+  <!-- ==================== START SCREEN ==================== -->
+  <div id="startScreen">
+    <div class="start-container">
+      <div class="zombie-icon">🧟</div>
+      <h1 class="game-title">MATH <span class="title-shoot">SHOOTER</span></h1>
+      <p class="subtitle">Tembak Zombie & Helikopter dengan Matematika! 🎯</p>
+      <p class="subtitle-small">OMN 2026 Edition - Soal Tak Terbatas</p>
+
+      <div class="form-group">
+        <label> Nama Pemain</label>
+        <input type="text" id="playerName" placeholder="Masukkan nama..." value="opik">
+      </div>
+
+      <div class="form-group">
+        <label>📚 Pilih Kategori</label>
+        <select id="categorySelect">
+          <option value="SEMUA KELAS">🎲 SEMUA KELAS (Campuran)</option>
+          <option value="KELAS 1">Kelas 1</option>
+          <option value="KELAS 2">Kelas 2</option>
+          <option value="KELAS 3">Kelas 3</option>
+        </select>
+      </div>
+
+      <button id="startBtn" class="btn-start">🚀 MULAI BERMAIN</button>
+      <button id="leaderboardBtn" class="btn-leaderboard">🏆 LEADERBOARD</button>
+      <button id="teacherModeBtn" class="btn-teacher">👨‍🏫 Mode Guru</button>
+    </div>
+  </div>
+
+  <!-- ==================== GAME SCREEN ==================== -->
+  <div id="gameScreen" style="display: none;">
+    <!-- HUD -->
+    <div class="hud">
+      <div class="hud-item"> Skor: <strong id="scoreDisplay">0</strong></div>
+      <div class="hud-item">🔥 Combo: <strong id="comboDisplay">0x</strong></div>
+      <div class="hud-item">🌊 Wave: <strong id="waveDisplay">1</strong></div>
+      <div class="hud-item">💀 Kalah: <strong id="defeatDisplay">0</strong></div>
     </div>
 
-    <!-- GAME SCREEN -->
-    <div id="gameScreen" class="screen">
-        <div class="game-hud">
-            <div class="hud-item">
-                <span class="icon">🎯</span>
-                <span>Skor: <span class="value" id="scoreValue">0</span></span>
-            </div>
-            <div class="hud-item">
-                <span class="icon">🔥</span>
-                <span>Combo: <span class="value" id="comboValue">0x</span></span>
-            </div>
-            <div class="hud-item">
-                <span class="icon">🌊</span>
-                <span>Wave: <span class="value" id="waveValue">1</span></span>
-            </div>
-            <div class="hud-item">
-                <span class="icon">💀</span>
-                <span>Kalah: <span class="value" id="defeatedValue">0</span></span>
-            </div>
-        </div>
-        
-        <div class="health-bar">
-            <div class="health-bar-fill" id="healthFill" style="width: 100%"></div>
-        </div>
-        
-        <div class="game-area">
-            <div class="game-area-bg"></div>
-            <div class="wave-indicator" id="waveIndicator">SOAL 1 / 15</div>
-            <div class="ground"></div>
-        </div>
-        
-        <div class="question-panel">
-            <span class="question-topic" id="questionTopic">TOPIC</span>
-            <div class="question-timer">
-                <div class="question-timer-fill" id="timerFill" style="width: 100%"></div>
-            </div>
-            <p class="question-text" id="questionText">Loading question...</p>
-            <div class="options-grid" id="optionsGrid"></div>
-        </div>
+    <!-- Progress Bar -->
+    <div class="progress-container">
+      <div id="progressBar" class="progress-bar"></div>
     </div>
 
-    <!-- RESULT SCREEN -->
-    <div id="resultScreen" class="screen">
-        <div class="result-card">
-            <div class="result-emoji" id="resultEmoji">🏆</div>
-            <h2 class="result-title" id="resultTitle">LUAR BIASA!</h2>
-            <p style="color: #aaa; margin-bottom: 10px;" id="resultPlayerName"></p>
-            
-            <div class="result-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="resultScore">0</div>
-                    <div class="stat-label">Total Skor</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="resultDefeated">0</div>
-                    <div class="stat-label">Musuh Dikalahkan</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="resultAccuracy">0%</div>
-                    <div class="stat-label">Akurasi</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="resultCombo">0x</div>
-                    <div class="stat-label">Max Combo</div>
-                </div>
-            </div>
-            
-            <div class="result-buttons">
-                <button class="btn btn-primary" id="playAgainBtn">🔄 MAIN LAGI</button>
-                <button class="btn btn-success" id="menuBtn">🏠 MENU</button>
-            </div>
-        </div>
+    <!-- Question Number -->
+    <div id="questionNum" class="question-num">SOAL 1 / 15</div>
+
+    <!-- Canvas -->
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- Question Box -->
+    <div id="questionBox" class="question-box">
+      <span id="topicLabel" class="topic-label">NILAI TEMPAT</span>
+      <p id="questionText">Loading...</p>
     </div>
 
-    <!-- LEADERBOARD SCREEN -->
-    <div id="leaderboardScreen" class="screen">
-        <h2 style="font-size: 2rem; margin-bottom: 20px; color: var(--warning);">🏆 LEADERBOARD</h2>
-        
-        <div class="leaderboard">
-            <ul class="leaderboard-list" id="leaderboardList">
-                <li class="loading">
-                    <div class="loading-spinner"></div>
-                    <p>Memuat...</p>
-                </li>
-            </ul>
+    <!-- Game Over Overlay -->
+    <div id="gameOverOverlay" class="overlay" style="display: none;">
+      <div class="overlay-content">
+        <h2 id="endTitle">💀 GAME OVER</h2>
+        <p class="final-score-text">Skor Akhir: <strong id="finalScore">0</strong></p>
+        <div class="overlay-buttons">
+          <button id="restartBtn" class="btn-restart">🔄 MAIN LAGI</button>
+          <button id="backToMenuBtn" class="btn-menu">🏠 KEMBALI KE MENU</button>
         </div>
-        
-        <br>
-        <button class="btn btn-primary" id="backFromLeaderboard">🏠 KEMBALI</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Scripts -->
-    <script src="question-generator.js"></script>
-    <script src="supabase.js"></script>
-    <script src="game.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>
