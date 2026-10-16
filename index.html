@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Math Shooter - OMN 2026</title>
+  <title>Math Adventure - Game Edukasi SD</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- START SCREEN -->
-  <div id="startScreen">
-    <div class="start-container">
-      <div class="zombie-icon"></div>
-      <h1 class="game-title">MATH <span class="title-shoot">SHOOTER</span></h1>
-      <p class="subtitle">Tembak Zombie & Helikopter dengan Matematika! 🎯</p>
-      <p class="subtitle-small">OMN 2026 Edition - Kelas 1-6 SD</p>
+  <!-- MAIN MENU -->
+  <div id="mainMenu" class="screen active">
+    <div class="menu-container">
+      <div class="logo-area">
+        <div class="logo-icon"></div>
+        <h1 class="main-title">MATH <span class="highlight">ADVENTURE</span></h1>
+        <p class="subtitle">Belajar Matematika Sambil Bermain! 🌟</p>
+        <p class="subtitle-small">Kelas 1-6 SD • 5 Game Seru</p>
+      </div>
 
       <div class="form-group">
         <label>👤 Nama Pemain</label>
@@ -22,7 +24,7 @@
       </div>
 
       <div class="form-group">
-        <label>📚 Pilih Kategori</label>
+        <label>📚 Pilih Kelas</label>
         <select id="categorySelect">
           <option value="SEMUA KELAS">🎲 SEMUA KELAS (Campuran 1-6)</option>
           <option value="1">Kelas 1 SD</option>
@@ -34,47 +36,76 @@
         </select>
       </div>
 
-      <button id="startBtn" class="btn-start">🚀 MULAI BERMAIN</button>
-      <button id="leaderboardBtn" class="btn-leaderboard"> LEADERBOARD</button>
-      <button id="teacherModeBtn" class="btn-teacher">‍🏫 Mode Guru</button>
+      <div class="game-grid">
+        <div class="game-card" data-game="shooter">
+          <div class="game-icon">🔫</div>
+          <h3>Math Shooter</h3>
+          <p>Tembak zombie dengan jawaban benar!</p>
+          <div class="difficulty">⭐⭐</div>
+        </div>
+
+        <div class="game-card" data-game="bubble">
+          <div class="game-icon"></div>
+          <h3>Bubble Pop</h3>
+          <p>Pecahkan gelembung jawaban yang tepat!</p>
+          <div class="difficulty">⭐</div>
+        </div>
+
+        <div class="game-card" data-game="runner">
+          <div class="game-icon">🏃</div>
+          <h3>Math Runner</h3>
+          <p>Lari dan pilih jalur yang benar!</p>
+          <div class="difficulty">⭐⭐⭐</div>
+        </div>
+
+        <div class="game-card" data-game="memory">
+          <div class="game-icon"></div>
+          <h3>Memory Match</h3>
+          <p>Cocokkan kartu soal dan jawaban!</p>
+          <div class="difficulty">⭐⭐</div>
+        </div>
+
+        <div class="game-card" data-game="space">
+          <div class="game-icon">🚀</div>
+          <h3>Space Math</h3>
+          <p>Hancurkan asteroid di luar angkasa!</p>
+          <div class="difficulty">⭐⭐⭐</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- GAME SCREEN -->
-  <div id="gameScreen" style="display: none;">
-    <div class="hud">
-      <div class="hud-item">🎯 Skor: <strong id="scoreDisplay">0</strong></div>
-      <div class="hud-item">🔥 Combo: <strong id="comboDisplay">0x</strong></div>
-      <div class="hud-item">🌊 Wave: <strong id="waveDisplay">1</strong></div>
-      <div class="hud-item">💀 Kalah: <strong id="defeatDisplay">0</strong></div>
-      <div class="hud-item" id="timerDisplay">⏱️ 20s</div>
-    </div>
-
-    <div class="progress-container">
-      <div id="progressBar" class="progress-bar"></div>
-    </div>
-
-    <div id="questionNum" class="question-num">SOAL 1 / 20</div>
-
-    <div class="canvas-container">
-      <canvas id="gameCanvas" width="800" height="600"></canvas>
-    </div>
-
-    <div id="questionBox" class="question-box">
-      <div class="question-header">
-        <span id="kelasLabel" class="kelas-label">Kelas 1</span>
-        <span id="topicLabel" class="topic-label">Penjumlahan</span>
+  <div id="gameScreen" class="screen">
+    <div class="game-header">
+      <button id="backBtn" class="btn-back">← Kembali</button>
+      <div class="hud">
+        <div class="hud-item">🎯 Skor: <strong id="scoreDisplay">0</strong></div>
+        <div class="hud-item">⏱️ <strong id="timerDisplay">30s</strong></div>
+        <div class="hud-item">❤️ Nyawa: <strong id="livesDisplay">3</strong></div>
+        <div class="hud-item">🔥 Combo: <strong id="comboDisplay">0x</strong></div>
       </div>
-      <p id="questionText">Loading...</p>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas"></canvas>
+      <div id="questionOverlay" class="question-overlay">
+        <div class="question-box">
+          <span id="kelasLabel" class="kelas-badge">Kelas 1</span>
+          <span id="topicLabel" class="topic-badge">Penjumlahan</span>
+          <p id="questionText">Loading...</p>
+        </div>
+      </div>
     </div>
 
     <div id="gameOverOverlay" class="overlay" style="display: none;">
       <div class="overlay-content">
-        <h2 id="endTitle">💀 GAME OVER</h2>
-        <p class="final-score-text">Skor Akhir: <strong id="finalScore">0</strong></p>
+        <h2 id="endTitle"> SELESAI!</h2>
+        <p class="final-score">Skor: <strong id="finalScore">0</strong></p>
+        <p class="final-stats" id="finalStats"></p>
         <div class="overlay-buttons">
-          <button id="restartBtn" class="btn-restart">🔄 MAIN LAGI</button>
-          <button id="backToMenuBtn" class="btn-menu">🏠 KEMBALI KE MENU</button>
+          <button id="restartBtn" class="btn-primary">🔄 Main Lagi</button>
+          <button id="menuBtn" class="btn-secondary">🏠 Menu Utama</button>
         </div>
       </div>
     </div>
